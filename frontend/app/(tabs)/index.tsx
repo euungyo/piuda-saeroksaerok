@@ -1,31 +1,36 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import EditScreenInfo from '@/components/EditScreenInfo';
-import { Text, View } from '@/components/Themed';
+import HomeHeader from "@/components/home/HomeHeader";
+import HomeMenuGrid from "@/components/home/HomeMenuGrid";
+import WelcomeBanner from "@/components/home/WelcomeBanner";
 
-export default function TabOneScreen() {
+// 홈 화면의 헤더, 환영 배너, 주요 메뉴 카드를 순서대로 배치합니다.
+export default function HomeScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Tab One</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <EditScreenInfo path="app/(tabs)/index.tsx" />
-    </View>
+    <SafeAreaView style={Styles.SafeArea} edges={["top"]}>
+      <View style={Styles.Content}>
+        <HomeHeader />
+        <WelcomeBanner />
+        <HomeMenuGrid />
+      </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+// 휴대폰 화면 안에서 홈 콘텐츠의 크기와 여백을 관리하는 스타일입니다.
+const Styles = StyleSheet.create({
+  SafeArea: {
+    backgroundColor: "#FFFDF8",
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
+  Content: {
+    alignSelf: "center",
+    flex: 1,
+    maxWidth: 430,
+    paddingBottom: 8,
+    paddingHorizontal: 14,
+    paddingTop: 4,
+    width: "100%",
   },
 });
