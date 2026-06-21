@@ -86,6 +86,7 @@ export default function TabLayout() {
           title: "가족사진",
         }}
       />
+      <Tabs.Screen name="settings" options={{ href: null }} />
       <Tabs.Screen name="two" options={{ href: null }} />
     </Tabs>
   );
