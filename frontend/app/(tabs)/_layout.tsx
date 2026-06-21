@@ -1,59 +1,92 @@
-import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { Tabs } from "expo-router";
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+// 현재 선택된 하단 탭의 아이콘과 글자에 사용하는 초록색입니다.
+const ACTIVE_COLOR = "#3E9B35";
+// 선택되지 않은 하단 탭의 아이콘과 글자에 사용하는 색상입니다.
+const INACTIVE_COLOR = "#343A3D";
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
-
+// 홈, 일기, 퀴즈, 가족사진 화면을 이동하는 하단 탭 메뉴를 구성합니다.
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
+        headerShown: false,
+        tabBarActiveTintColor: ACTIVE_COLOR,
+        tabBarInactiveTintColor: INACTIVE_COLOR,
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "700",
+          marginTop: 1,
+        },
+        tabBarStyle: {
+          backgroundColor: "#FFFDF9",
+          borderColor: "#ECE9E1",
+          borderRadius: 22,
+          borderTopWidth: 1,
+          elevation: 8,
+          height: 70,
+          marginBottom: 5,
+          marginHorizontal: 10,
+          paddingBottom: 7,
+          paddingTop: 6,
+          shadowColor: "#6B665D",
+          shadowOffset: { height: 3, width: 0 },
+          shadowOpacity: 0.12,
+          shadowRadius: 10,
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
+          tabBarIcon: ({ color }) => (
+            <FontAwesome color={color} name="home" size={24} />
           ),
+          title: "홈",
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="diary"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              color={color}
+              name="notebook-outline"
+              size={25}
+            />
+          ),
+          title: "일기",
         }}
       />
+      <Tabs.Screen
+        name="quiz"
+        options={{
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              color={color}
+              name="head-question-outline"
+              size={26}
+            />
+          ),
+          title: "퀴즈",
+        }}
+      />
+      <Tabs.Screen
+        name="family"
+        options={{
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              color={color}
+              name="account-group-outline"
+              size={26}
+            />
+          ),
+          title: "가족사진",
+        }}
+      />
+      <Tabs.Screen name="two" options={{ href: null }} />
     </Tabs>
   );
 }
