@@ -77,7 +77,16 @@ export default function FamilyScreen() {
   }
 
   function HandleFamilyFeaturePress(FeatureName: string) {
-    // TODO: 사진 업로드/조회 화면과 API가 준비되면 각 경로로 연결합니다.
+    if (FeatureName === "사진 등록") {
+      Router.push("./family-upload");
+      return;
+    }
+
+    if (FeatureName === "사진 목록 조회") {
+      Router.push("./family-list");
+      return;
+    }
+
     Alert.alert(FeatureName, `${FeatureName} 화면을 준비하고 있어요.`);
   }
 
