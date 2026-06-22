@@ -91,12 +91,16 @@ export default function DiaryScreen() {
   }
 
   function HandleDiaryFeaturePress(FeatureName: string) {
+    if (FeatureName === "오늘의 일기 작성") {
+      Router.push("./diary-write");
+      return;
+    }
+
     if (FeatureName === "일기 조회") {
       Router.push("./diary-list");
       return;
     }
 
-    // TODO: 일기 작성 화면과 API가 준비되면 실제 작성 경로로 연결합니다.
     Alert.alert(FeatureName, `${FeatureName} 화면을 준비하고 있어요.`);
   }
 
