@@ -60,6 +60,7 @@ export default function TabLayout() {
           title: "일기",
         }}
       />
+      <Tabs.Screen name="diary-list" options={{ href: null }} />
       <Tabs.Screen
         name="quiz"
         options={{
