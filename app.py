@@ -2,7 +2,7 @@ from flask import Flask
 from flask_cors import CORS
 from backend.error_handler import register_error_handlers
 from backend.photo.photo_routes import PhotoBlueprint
-from backend.quiz.quiz_routes import QuizBlueprint
+from backend.diary_quiz.quiz_routes import QuizBlueprint
 from backend.diary.diary_routes import diary_bp
 
 
