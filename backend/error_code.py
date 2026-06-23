@@ -28,6 +28,7 @@ class ErrorCode(Enum):
 
     # AI 꼬리질문 에러
     FOLLOWUP_GENERATION_FAILED = (502, "AI 꼬리질문 생성에 실패했어요. 잠시 후 다시 시도해주세요.")
+    DIARY_COMPOSE_FAILED = (502, "AI 일기 작성에 실패했어요. 잠시 후 다시 시도해주세요.")
 
     def __init__(self, status, message):
         self.status = status
