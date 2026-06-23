@@ -62,6 +62,9 @@ export type SavedFollowupTopic = {
 
 export type QuestionDiary = {
   _id: string;
+  title: string;
+  content: string;
+  topics: string[];
   answers: DiaryAnswer[];
   followups: SavedFollowupTopic[];
   createdAt: string;
@@ -145,5 +148,12 @@ export function SaveFollowups(
   return Request<QuestionDiary>(`/api/diary/answers/${DiaryId}/followups`, {
     method: "POST",
     body: JSON.stringify({ followups: Followups }),
+  });
+}
+
+// 답변/꼬리질문을 바탕으로 AI가 하나의 일기를 작성·저장
+export function ComposeDiary(DiaryId: string): Promise<QuestionDiary> {
+  return Request<QuestionDiary>(`/api/diary/answers/${DiaryId}/compose`, {
+    method: "POST",
   });
 }

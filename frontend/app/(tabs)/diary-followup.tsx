@@ -15,12 +15,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { FetchFollowups, SaveFollowups, type FollowupTopic } from "@/lib/api";
+import {
+  ComposeDiary,
+  FetchFollowups,
+  SaveFollowups,
+  type FollowupTopic,
+} from "@/lib/api";
 import { ShowAlert } from "@/lib/alert";
 
-type Step = "intro" | "loading" | "answering" | "submitting" | "error";
+type Step = "intro" | "loading" | "answering" | "composing" | "error";
 
-// 작성한 일기를 바탕으로 AI가 꼬리질문을 던지고, 답변을 추가로 받는 화면입니다.
+// 작성한 일기를 바탕으로 AI 꼬리질문을 받고, 최종적으로 AI가 일기를 완성하는 화면입니다.
 export default function DiaryFollowupScreen() {
   const Router = useRouter();
   const Params = useLocalSearchParams<{ id?: string | string[] }>();
@@ -75,13 +80,13 @@ export default function DiaryFollowupScreen() {
     );
   }
 
-  // 꼬리질문 답변 저장
-  async function HandleSubmit() {
+  // "완료" → 꼬리질문 답변 저장 후 AI 일기 작성
+  async function HandleFinish() {
     if (!DiaryId) {
       return;
     }
 
-    SetCurrentStep("submitting");
+    SetCurrentStep("composing");
 
     try {
       await SaveFollowups(
@@ -95,15 +100,40 @@ export default function DiaryFollowupScreen() {
         })),
       );
 
-      ShowAlert("오늘의 일기", "이야기를 더해주셔서 고마워요!", GoToList);
+      await ComposeDiary(DiaryId);
+      GoToList();
     } catch (Error_) {
       ShowAlert(
-        "저장 실패",
-        Error_ instanceof Error ? Error_.message : "저장에 실패했어요.",
+        "일기 작성 실패",
+        Error_ instanceof Error ? Error_.message : "다시 시도해주세요.",
       );
       SetCurrentStep("answering");
     }
   }
+
+  // "아니요, 나중에 할게요" → 꼬리질문 없이 기본 답변만으로 AI 일기 작성
+  async function HandleDecline() {
+    if (!DiaryId) {
+      GoToList();
+      return;
+    }
+
+    SetCurrentStep("composing");
+
+    try {
+      await ComposeDiary(DiaryId);
+    } catch {
+      // 작성 실패해도 답변은 이미 저장돼 있으므로 목록으로 이동합니다.
+    }
+
+    GoToList();
+  }
+
+  const ShowIntroCard =
+    CurrentStep === "intro" ||
+    CurrentStep === "loading" ||
+    CurrentStep === "composing" ||
+    CurrentStep === "error";
 
   return (
     <SafeAreaView style={Styles.SafeArea} edges={["top"]}>
@@ -146,9 +176,7 @@ export default function DiaryFollowupScreen() {
             <View style={Styles.HeaderButton} />
           </View>
 
-          {(CurrentStep === "intro" ||
-            CurrentStep === "loading" ||
-            CurrentStep === "error") && (
+          {ShowIntroCard && (
             <View style={Styles.IntroCard}>
               <View pointerEvents="none" style={Styles.CardLeaves}>
                 <MaterialCommunityIcons color="#A8BC7C" name="leaf" size={30} />
@@ -168,7 +196,7 @@ export default function DiaryFollowupScreen() {
                 />
               </View>
 
-              {CurrentStep === "loading" ? (
+              {CurrentStep === "loading" || CurrentStep === "composing" ? (
                 <>
                   <ActivityIndicator
                     color="#759650"
@@ -176,7 +204,9 @@ export default function DiaryFollowupScreen() {
                     style={Styles.IntroSpinner}
                   />
                   <Text style={Styles.IntroSubtitle}>
-                    작성해주신 내용을 바탕으로{"\n"}AI가 질문을 만들고 있어요...
+                    {CurrentStep === "loading"
+                      ? "작성해주신 내용을 바탕으로\nAI가 질문을 만들고 있어요..."
+                      : "오늘의 답변을 모아\nAI가 일기를 쓰고 있어요..."}
                   </Text>
                 </>
               ) : CurrentStep === "error" ? (
@@ -199,7 +229,7 @@ export default function DiaryFollowupScreen() {
                   <Pressable
                     accessibilityLabel="건너뛰기"
                     accessibilityRole="button"
-                    onPress={GoToList}
+                    onPress={HandleDecline}
                     style={({ pressed }) => [
                       Styles.SecondaryButton,
                       pressed && Styles.Pressed,
@@ -232,7 +262,7 @@ export default function DiaryFollowupScreen() {
                   <Pressable
                     accessibilityLabel="아니요, 나중에 할게요"
                     accessibilityRole="button"
-                    onPress={GoToList}
+                    onPress={HandleDecline}
                     style={({ pressed }) => [
                       Styles.SecondaryButton,
                       pressed && Styles.Pressed,
@@ -247,7 +277,7 @@ export default function DiaryFollowupScreen() {
             </View>
           )}
 
-          {(CurrentStep === "answering" || CurrentStep === "submitting") && (
+          {CurrentStep === "answering" && (
             <View style={Styles.AnswerArea}>
               {Topics.map((Topic, Ti) => (
                 <View key={Topic.questionId} style={Styles.TopicCard}>
@@ -267,7 +297,6 @@ export default function DiaryFollowupScreen() {
                       </View>
                       <TextInput
                         accessibilityLabel={`꼬리질문 답변 ${Ti + 1}-${Fi + 1}`}
-                        editable={CurrentStep !== "submitting"}
                         maxLength={500}
                         multiline
                         onChangeText={(Value) =>
@@ -287,19 +316,14 @@ export default function DiaryFollowupScreen() {
               <Pressable
                 accessibilityLabel="꼬리질문 답변 완료"
                 accessibilityRole="button"
-                disabled={CurrentStep === "submitting"}
-                onPress={HandleSubmit}
+                onPress={HandleFinish}
                 style={({ pressed }) => [
                   Styles.PrimaryButton,
                   Styles.SubmitButton,
                   pressed && Styles.Pressed,
                 ]}
               >
-                {CurrentStep === "submitting" ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={Styles.PrimaryButtonText}>완료</Text>
-                )}
+                <Text style={Styles.PrimaryButtonText}>완료</Text>
               </Pressable>
             </View>
           )}

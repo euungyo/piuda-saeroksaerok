@@ -22,6 +22,8 @@ type DiaryItem = {
   date: string;
   day: string;
   id: string;
+  title: string;
+  topics: string[];
 };
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -39,9 +41,21 @@ function FormatDate(Iso: string): { date: string; day: string } {
 // 질문 일기 문서를 목록 카드용 데이터로 변환합니다.
 function ToDiaryItem(Diary: QuestionDiary): DiaryItem {
   const { date, day } = FormatDate(Diary.createdAt);
-  const Content = Diary.answers.map((Answer) => Answer.answer).join("  ·  ");
 
-  return { id: Diary._id, date, day, content: Content };
+  // AI가 작성한 일기가 있으면 그것을, 없으면 답변을 이어붙여 보여줍니다.
+  const Content =
+    Diary.content?.trim() ||
+    Diary.answers.map((Answer) => Answer.answer).join("  ·  ");
+  const Title = Diary.title?.trim() || "오늘의 일기";
+
+  return {
+    id: Diary._id,
+    date,
+    day,
+    title: Title,
+    content: Content,
+    topics: Diary.topics ?? [],
+  };
 }
 
 // 작성한 일기를 날짜와 내용으로 검색하고 확인하는 화면입니다.
@@ -81,7 +95,9 @@ export default function DiaryListScreen() {
     return Items.filter(
       (Item) =>
         Item.date.includes(Query) ||
-        Item.content.toLowerCase().includes(Query),
+        Item.title.toLowerCase().includes(Query) ||
+        Item.content.toLowerCase().includes(Query) ||
+        Item.topics.some((Topic) => Topic.toLowerCase().includes(Query)),
     );
   }, [Items, SearchText]);
 
@@ -219,10 +235,20 @@ export default function DiaryListScreen() {
                     <Text style={Styles.DiaryDate}>
                       {Item.date} ({Item.day})
                     </Text>
-                    <Text style={Styles.DiaryTitle}>오늘의 일기</Text>
+                    <Text style={Styles.DiaryTitle}>{Item.title}</Text>
                     <Text numberOfLines={3} style={Styles.DiaryContent}>
                       {Item.content}
                     </Text>
+
+                    {Item.topics.length > 0 && (
+                      <View style={Styles.TopicRow}>
+                        {Item.topics.map((Topic) => (
+                          <View key={Topic} style={Styles.TopicChip}>
+                            <Text style={Styles.TopicChipText}>#{Topic}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </View>
 
                   <View style={Styles.DetailArea}>
@@ -409,6 +435,23 @@ const Styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 17,
     marginTop: 7,
+  },
+  TopicRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 9,
+  },
+  TopicChip: {
+    backgroundColor: "#EEF3E3",
+    borderRadius: 11,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  TopicChipText: {
+    color: "#5C7740",
+    fontSize: 10,
+    fontWeight: "800",
   },
   DetailArea: {
     alignItems: "center",
