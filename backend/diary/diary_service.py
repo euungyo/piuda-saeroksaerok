@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta
 from bson.errors import InvalidId
+import json
 import os
 import uuid
 from werkzeug.utils import secure_filename
 from backend.exceptions import CustomException
 from backend.error_code import ErrorCode
+from backend.gemini import gemini_client
 
 from backend.diary.diary_model import (
     insert_diary,
@@ -20,6 +22,7 @@ from backend.diary.diary_model import (
     find_all_question_diaries,
     find_question_diary_by_id,
     count_question_diaries_between,
+    update_question_diary,
 )
 
 ALLOWED_MOODS = ["happy", "sad", "angry", "tired", "calm"]
@@ -253,6 +256,7 @@ def serialize_question_diary(doc):
     return {
         "_id": str(doc["_id"]),
         "answers": doc.get("answers", []),
+        "followups": doc.get("followups", []),
         "createdAt": doc["createdAt"].isoformat(),
         "updatedAt": doc["updatedAt"].isoformat(),
     }
@@ -370,3 +374,142 @@ def get_today_status_service():
     count = count_question_diaries_between(start_utc, end_utc)
 
     return {"written": count > 0, "count": count}, 200
+
+
+# =========================================================
+# AI 꼬리질문 (작성한 답변을 바탕으로 Gemini가 추가 질문 생성)
+# =========================================================
+
+# 대주제(질문)당 생성할 꼬리질문 개수 범위
+FOLLOWUP_MIN = 2
+FOLLOWUP_MAX = 3
+
+
+# 작성된 답변들로 Gemini 프롬프트를 구성합니다.
+def build_followup_prompt(answers):
+    lines = []
+    for index, answer in enumerate(answers, start=1):
+        lines.append(
+            f'{index}. (questionId: {answer["questionId"]}) '
+            f'질문: {answer.get("question", "")} / 답변: {answer.get("answer", "")}'
+        )
+    diary_text = "\n".join(lines)
+
+    return (
+        "당신은 노인을 위한 일기 앱의 따뜻한 대화 도우미입니다.\n"
+        "사용자가 아래 질문들에 답해 오늘의 일기를 작성했습니다.\n"
+        f"각 질문(대주제)마다, 사용자의 답변 내용을 바탕으로 자연스럽고 구체적인 "
+        f"꼬리질문을 {FOLLOWUP_MIN}~{FOLLOWUP_MAX}개씩 만들어 주세요.\n"
+        "- 답변에 등장한 구체적 내용(음식/사람/장소 등)을 활용해 더 깊이 물어보세요.\n"
+        "- 짧고 친근한 존댓말 한 문장으로 작성하세요.\n"
+        f"- 답변이 비어있거나 의미를 알 수 없으면 그 주제에 대한 가벼운 일반 질문 {FOLLOWUP_MIN}개를 만들어 주세요.\n\n"
+        f"[작성된 일기]\n{diary_text}\n\n"
+        "반드시 아래 JSON 형식으로만 답하세요(다른 텍스트 금지):\n"
+        '{"topics":[{"questionId":"<위 questionId 그대로>","followups":["질문1","질문2"]}]}'
+    )
+
+
+# 저장된 일기를 불러와 Gemini로 대주제별 꼬리질문을 생성합니다.
+def generate_followups_service(diary_id):
+    try:
+        doc = find_question_diary_by_id(diary_id)
+    except InvalidId:
+        raise CustomException(ErrorCode.INVALID_ID_FORMAT)
+
+    if not doc:
+        raise CustomException(ErrorCode.DIARY_NOT_FOUND)
+
+    answers = doc.get("answers", [])
+    if not answers:
+        raise CustomException(ErrorCode.ANSWERS_REQUIRED)
+
+    prompt = build_followup_prompt(answers)
+
+    try:
+        raw = gemini_client.generate_json(prompt)
+        topics_raw = json.loads(raw).get("topics", [])
+    except Exception:
+        # Gemini 키 미설정/네트워크/파싱 실패 등은 모두 동일한 사용자 메시지로 처리
+        raise CustomException(ErrorCode.FOLLOWUP_GENERATION_FAILED)
+
+    # questionId -> 원본 답변 매핑 (꼬리질문에 맥락을 붙여 돌려주기 위함)
+    answer_by_id = {answer["questionId"]: answer for answer in answers}
+
+    topics = []
+    for topic in topics_raw:
+        question_id = (topic or {}).get("questionId")
+        base = answer_by_id.get(question_id)
+        if not base:
+            continue
+
+        followups = [
+            text.strip()
+            for text in (topic.get("followups") or [])
+            if isinstance(text, str) and text.strip()
+        ][:FOLLOWUP_MAX]
+
+        if not followups:
+            continue
+
+        topics.append({
+            "questionId": question_id,
+            "question": base.get("question", ""),
+            "answer": base.get("answer", ""),
+            "followups": followups,
+        })
+
+    if not topics:
+        raise CustomException(ErrorCode.FOLLOWUP_GENERATION_FAILED)
+
+    return {"diaryId": str(doc["_id"]), "topics": topics}, 200
+
+
+# 사용자가 답한 꼬리질문 답변을 일기 문서에 저장합니다.
+def save_followups_service(diary_id, payload):
+    try:
+        doc = find_question_diary_by_id(diary_id)
+    except InvalidId:
+        raise CustomException(ErrorCode.INVALID_ID_FORMAT)
+
+    if not doc:
+        raise CustomException(ErrorCode.DIARY_NOT_FOUND)
+
+    payload = payload or {}
+    topics = payload.get("followups")
+
+    if not topics or not isinstance(topics, list):
+        raise CustomException(ErrorCode.ANSWERS_REQUIRED)
+
+    saved = []
+    for topic in topics:
+        topic = topic or {}
+        question_id = topic.get("questionId")
+        items = topic.get("items")
+
+        if not question_id or not isinstance(items, list):
+            continue
+
+        clean_items = []
+        for pair in items:
+            pair = pair or {}
+            question = pair.get("question")
+            answer = pair.get("answer")
+
+            if not question:
+                continue
+
+            clean_items.append({
+                "question": question,
+                "answer": (answer or "").strip(),
+            })
+
+        if clean_items:
+            saved.append({"questionId": question_id, "items": clean_items})
+
+    update_question_diary(str(doc["_id"]), {
+        "followups": saved,
+        "updatedAt": datetime.utcnow(),
+    })
+
+    updated = find_question_diary_by_id(str(doc["_id"]))
+    return serialize_question_diary(updated), 200

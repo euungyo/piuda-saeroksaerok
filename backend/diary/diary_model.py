@@ -89,3 +89,11 @@ def count_question_diaries_between(start, end):
     return question_diaries.count_documents({
         "createdAt": {"$gte": start, "$lt": end}
     })
+
+
+# 질문 일기 부분 수정 (예: AI 꼬리질문/답변 추가)
+def update_question_diary(diary_id, update_fields):
+    return question_diaries.update_one(
+        {"_id": ObjectId(diary_id)},
+        {"$set": update_fields}
+    )

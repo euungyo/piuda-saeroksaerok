@@ -12,6 +12,8 @@ from backend.diary.diary_service import (
     get_question_diaries_service,
     get_question_diary_service,
     get_today_status_service,
+    generate_followups_service,
+    save_followups_service,
 )
 
 diary_bp = Blueprint("diary", __name__)
@@ -126,5 +128,25 @@ def get_question_diary(diary_id):
 @diary_bp.route("/api/diary/today", methods=["GET"])
 def get_today_status():
     response, status_code = get_today_status_service()
+
+    return jsonify(response), status_code
+
+
+# AI 꼬리질문 생성 API (저장된 일기 답변을 바탕으로 Gemini가 추가 질문 생성)
+
+@diary_bp.route("/api/diary/answers/<diary_id>/followups", methods=["GET"])
+def get_followups(diary_id):
+    response, status_code = generate_followups_service(diary_id)
+
+    return jsonify(response), status_code
+
+
+# AI 꼬리질문 답변 저장 API
+
+@diary_bp.route("/api/diary/answers/<diary_id>/followups", methods=["POST"])
+def save_followups(diary_id):
+    payload = request.get_json(silent=True)
+
+    response, status_code = save_followups_service(diary_id, payload)
 
     return jsonify(response), status_code
