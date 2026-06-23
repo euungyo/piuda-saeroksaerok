@@ -14,6 +14,7 @@ from backend.diary.diary_service import (
     get_today_status_service,
     generate_followups_service,
     save_followups_service,
+    compose_diary_service,
 )
 
 diary_bp = Blueprint("diary", __name__)
@@ -148,5 +149,14 @@ def save_followups(diary_id):
     payload = request.get_json(silent=True)
 
     response, status_code = save_followups_service(diary_id, payload)
+
+    return jsonify(response), status_code
+
+
+# AI 일기 작성 API (답변/꼬리질문을 엮어 하나의 일기로 완성 후 저장)
+
+@diary_bp.route("/api/diary/answers/<diary_id>/compose", methods=["POST"])
+def compose_diary(diary_id):
+    response, status_code = compose_diary_service(diary_id)
 
     return jsonify(response), status_code

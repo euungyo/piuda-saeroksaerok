@@ -255,6 +255,9 @@ def serialize_question(doc):
 def serialize_question_diary(doc):
     return {
         "_id": str(doc["_id"]),
+        "title": doc.get("title", ""),
+        "content": doc.get("content", ""),
+        "topics": doc.get("topics", []),
         "answers": doc.get("answers", []),
         "followups": doc.get("followups", []),
         "createdAt": doc["createdAt"].isoformat(),
@@ -508,6 +511,83 @@ def save_followups_service(diary_id, payload):
 
     update_question_diary(str(doc["_id"]), {
         "followups": saved,
+        "updatedAt": datetime.utcnow(),
+    })
+
+    updated = find_question_diary_by_id(str(doc["_id"]))
+    return serialize_question_diary(updated), 200
+
+
+# =========================================================
+# AI 일기 작성 (답변 + 꼬리질문 답변을 엮어 하나의 일기로 완성)
+# =========================================================
+
+# 답변과 꼬리질문 답변으로 일기 작성 프롬프트를 구성합니다.
+def build_compose_prompt(answers, followups):
+    followups_by_id = {
+        topic.get("questionId"): topic.get("items", [])
+        for topic in (followups or [])
+    }
+
+    blocks = []
+    for answer in answers:
+        block = [f'■ 질문: {answer.get("question", "")} / 답변: {answer.get("answer", "")}']
+        for item in followups_by_id.get(answer["questionId"], []):
+            block.append(f'   ↳ {item.get("question", "")} / {item.get("answer", "")}')
+        blocks.append("\n".join(block))
+
+    diary_source = "\n".join(blocks)
+
+    return (
+        "당신은 노인을 위한 따뜻한 일기 작가입니다.\n"
+        "사용자가 오늘 아래 질문들에 답했습니다(기본 질문과, 그에 대한 AI 꼬리질문 답변 포함).\n"
+        "이 답변들을 자연스럽게 엮어, 사용자가 직접 쓴 것 같은 1인칭 시점의 따뜻한 하루 일기를 작성해 주세요.\n\n"
+        "[규칙]\n"
+        "- title: 하루를 잘 담은 짧고 정겨운 제목 (12자 이내)\n"
+        "- content: 3~5문장의 1인칭 일기. 답변에 없는 사실은 지어내지 말고, 답변 내용만 자연스럽게 풀어 써주세요. 따뜻하고 편안한 말투로.\n"
+        "- topics: 이 일기의 대주제를 나타내는 짧은 키워드 2~5개 (예: \"점심\", \"산책\")\n\n"
+        f"[오늘의 답변]\n{diary_source}\n\n"
+        "반드시 아래 JSON 형식으로만 답하세요(다른 텍스트 금지):\n"
+        '{"title":"...","content":"...","topics":["...","..."]}'
+    )
+
+
+# 저장된 답변/꼬리질문을 바탕으로 AI가 일기를 완성해 저장합니다.
+def compose_diary_service(diary_id):
+    try:
+        doc = find_question_diary_by_id(diary_id)
+    except InvalidId:
+        raise CustomException(ErrorCode.INVALID_ID_FORMAT)
+
+    if not doc:
+        raise CustomException(ErrorCode.DIARY_NOT_FOUND)
+
+    answers = doc.get("answers", [])
+    if not answers:
+        raise CustomException(ErrorCode.ANSWERS_REQUIRED)
+
+    prompt = build_compose_prompt(answers, doc.get("followups", []))
+
+    try:
+        data = json.loads(gemini_client.generate_json(prompt))
+    except Exception:
+        raise CustomException(ErrorCode.DIARY_COMPOSE_FAILED)
+
+    title = (data.get("title") or "오늘의 일기").strip()
+    content = (data.get("content") or "").strip()
+    topics = [
+        topic.strip()
+        for topic in (data.get("topics") or [])
+        if isinstance(topic, str) and topic.strip()
+    ][:5]
+
+    if not content:
+        raise CustomException(ErrorCode.DIARY_COMPOSE_FAILED)
+
+    update_question_diary(str(doc["_id"]), {
+        "title": title,
+        "content": content,
+        "topics": topics,
         "updatedAt": datetime.utcnow(),
     })
 
