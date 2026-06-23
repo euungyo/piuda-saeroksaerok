@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson.errors import InvalidId
 import os
 import uuid
@@ -12,6 +12,14 @@ from backend.diary.diary_model import (
     find_diary_by_id,
     update_diary_by_id,
     delete_diary_by_id,
+    insert_questions,
+    count_questions,
+    find_random_questions,
+    find_question_by_id,
+    insert_question_diary,
+    find_all_question_diaries,
+    find_question_diary_by_id,
+    count_question_diaries_between,
 )
 
 ALLOWED_MOODS = ["happy", "sad", "angry", "tired", "calm"]
@@ -210,3 +218,155 @@ def delete_diary_service(diary_id):
         raise CustomException(ErrorCode.DIARY_DELETE_FAILED)
 
     return {"message": "삭제완료"}, 200
+
+
+# =========================================================
+# 질문 기반 일기 작성 (오늘의 일기 작성 → 질문에 답하기)
+# =========================================================
+
+# 작성 화면에 한 번에 보여줄 기본 질문 개수 (UI상 1/3)
+DEFAULT_QUESTION_COUNT = 3
+
+# 일상적인 기본 질문들 (DB가 비어있을 때 시드로 삽입)
+DEFAULT_QUESTIONS = [
+    "오늘 점심은 무엇을 드셨나요?",
+    "오늘 무슨 옷을 입으셨나요?",
+    "오늘 아침에 일어나서 가장 먼저 한 일은 무엇인가요?",
+    "오늘 가장 기억에 남는 순간은 언제였나요?",
+    "오늘 누구와 함께 시간을 보내셨나요?",
+    "오늘 드신 음식 중 가장 맛있었던 건 무엇인가요?",
+    "오늘 날씨는 어땠나요?",
+    "오늘 하루를 한 단어로 표현한다면 무엇인가요?",
+]
+
+
+# 질문 문서를 프론트로 보낼 JSON 형태로 변환
+def serialize_question(doc):
+    return {
+        "_id": str(doc["_id"]),
+        "text": doc.get("text"),
+    }
+
+
+# 질문 일기 문서를 프론트로 보낼 JSON 형태로 변환 (조회용)
+def serialize_question_diary(doc):
+    return {
+        "_id": str(doc["_id"]),
+        "answers": doc.get("answers", []),
+        "createdAt": doc["createdAt"].isoformat(),
+        "updatedAt": doc["updatedAt"].isoformat(),
+    }
+
+
+# 기본 질문 시드: 질문이 하나도 없을 때만 삽입 (이미 있으면 건너뜀)
+def seed_questions_service():
+    if count_questions() > 0:
+        return {"message": "이미 질문이 존재합니다.", "inserted": 0}, 200
+
+    now = datetime.utcnow()
+    docs = [{"text": text, "createdAt": now} for text in DEFAULT_QUESTIONS]
+    result = insert_questions(docs)
+
+    return {"message": "질문 시드 완료", "inserted": len(result.inserted_ids)}, 201
+
+
+# 오늘의 질문 조회: 질문 풀에서 랜덤 N개
+def get_daily_questions_service(count=DEFAULT_QUESTION_COUNT):
+    if not count or count < 1:
+        count = DEFAULT_QUESTION_COUNT
+
+    if count_questions() == 0:
+        raise CustomException(ErrorCode.NO_QUESTIONS_AVAILABLE)
+
+    docs = find_random_questions(count)
+    return [serialize_question(doc) for doc in docs], 200
+
+
+# 질문 일기 작성: 답변들의 questionId 유효성/존재 + 답변 비어있는지 검증 후 저장
+def create_question_diary_service(payload):
+    payload = payload or {}
+    answer_items = payload.get("answers")
+
+    if not answer_items or not isinstance(answer_items, list):
+        raise CustomException(ErrorCode.ANSWERS_REQUIRED)
+
+    saved_answers = []
+
+    for item in answer_items:
+        item = item or {}
+        question_id = item.get("questionId")
+        answer_text = item.get("answer")
+
+        if not question_id:
+            raise CustomException(ErrorCode.INVALID_REQUEST)
+
+        if not answer_text or not answer_text.strip():
+            raise CustomException(ErrorCode.ANSWER_EMPTY)
+
+        try:
+            question_doc = find_question_by_id(question_id)
+        except InvalidId:
+            raise CustomException(ErrorCode.INVALID_ID_FORMAT)
+
+        if not question_doc:
+            raise CustomException(ErrorCode.QUESTION_NOT_FOUND)
+
+        # 질문 텍스트를 함께 저장(비정규화)해 이후 질문이 바뀌어도 기록이 보존되도록 함
+        saved_answers.append({
+            "questionId": str(question_doc["_id"]),
+            "question": question_doc.get("text"),
+            "answer": answer_text.strip(),
+        })
+
+    now = datetime.utcnow()
+    doc = {
+        "answers": saved_answers,
+        "createdAt": now,
+        "updatedAt": now,
+    }
+
+    result = insert_question_diary(doc)
+
+    response = {
+        "_id": str(result.inserted_id),
+        "answers": saved_answers,
+        "createdAt": now.isoformat(),
+        "updatedAt": now.isoformat(),
+    }
+
+    return response, 201
+
+
+# 질문 일기 목록 조회 (일기 조회 화면용)
+def get_question_diaries_service():
+    docs = find_all_question_diaries()
+    return [serialize_question_diary(doc) for doc in docs], 200
+
+
+# 질문 일기 상세 조회
+def get_question_diary_service(diary_id):
+    try:
+        doc = find_question_diary_by_id(diary_id)
+    except InvalidId:
+        raise CustomException(ErrorCode.INVALID_ID_FORMAT)
+
+    if not doc:
+        raise CustomException(ErrorCode.DIARY_NOT_FOUND)
+
+    return serialize_question_diary(doc), 200
+
+
+# 오늘(로컬 기준) 질문 일기를 작성했는지 여부 조회
+def get_today_status_service():
+    # createdAt 은 UTC(utcnow)로 저장되므로, 로컬 자정 구간을 UTC 로 변환해 조회한다.
+    utc_now = datetime.utcnow()
+    offset = datetime.now() - utc_now            # 로컬 타임존 보정 (KST ≈ +9h)
+
+    today_local = (utc_now + offset).date()
+    start_local = datetime(today_local.year, today_local.month, today_local.day)
+    start_utc = start_local - offset
+    end_utc = start_utc + timedelta(days=1)
+
+    count = count_question_diaries_between(start_utc, end_utc)
+
+    return {"written": count > 0, "count": count}, 200
