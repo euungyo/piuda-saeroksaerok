@@ -26,6 +26,9 @@ class ErrorCode(Enum):
     ANSWERS_REQUIRED = (400, "답변이 필요합니다.")
     ANSWER_EMPTY = (400, "답변 내용이 비어있습니다.")
 
+    # AI 꼬리질문 에러
+    FOLLOWUP_GENERATION_FAILED = (502, "AI 꼬리질문 생성에 실패했어요. 잠시 후 다시 시도해주세요.")
+
     def __init__(self, status, message):
         self.status = status
         self.message = message
