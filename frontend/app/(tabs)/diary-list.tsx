@@ -1,9 +1,10 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,57 +14,76 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { FetchQuestionDiaries, type QuestionDiary } from "@/lib/api";
+import { ShowAlert } from "@/lib/alert";
+
 type DiaryItem = {
   content: string;
   date: string;
   day: string;
-  id: number;
-  title: string;
+  id: string;
 };
 
-// 일기 API가 연결되기 전 목록 UI와 검색 기능 확인에 사용하는 임시 데이터입니다.
-const MOCK_DIARY_ITEMS: DiaryItem[] = [
-  {
-    id: 1,
-    date: "2026.05.18",
-    day: "월",
-    title: "공원 산책한 날",
-    content:
-      "아침 공기가 정말 상쾌했어요.\n공원에서 걷고, 벤치에 앉아 책도 읽었어요.\n마음이 편안해지는 하루였습니다.",
-  },
-  {
-    id: 2,
-    date: "2026.05.15",
-    day: "금",
-    title: "가족과 점심",
-    content:
-      "딸과 손주가 집에 와서 함께 점심을 먹었어요.\n손주의 이야기 덕분에 웃음이 끊이지 않았어요.\n정말 행복한 시간이었습니다.",
-  },
-  {
-    id: 3,
-    date: "2026.05.12",
-    day: "화",
-    title: "오늘의 시장 나들이",
-    content:
-      "오랜만에 시장에 다녀왔어요.\n싱싱한 채소와 과일을 많이 샀어요.\n저녁에 맛있는 반찬을 만들어야겠어요.",
-  },
-];
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+// 서버의 UTC createdAt 을 로컬 날짜/요일로 변환합니다.
+function FormatDate(Iso: string): { date: string; day: string } {
+  const Parsed = new Date(Iso.endsWith("Z") ? Iso : `${Iso}Z`);
+  const Year = Parsed.getFullYear();
+  const Month = String(Parsed.getMonth() + 1).padStart(2, "0");
+  const Day = String(Parsed.getDate()).padStart(2, "0");
+
+  return { date: `${Year}.${Month}.${Day}`, day: WEEKDAYS[Parsed.getDay()] };
+}
+
+// 질문 일기 문서를 목록 카드용 데이터로 변환합니다.
+function ToDiaryItem(Diary: QuestionDiary): DiaryItem {
+  const { date, day } = FormatDate(Diary.createdAt);
+  const Content = Diary.answers.map((Answer) => Answer.answer).join("  ·  ");
+
+  return { id: Diary._id, date, day, content: Content };
+}
 
 // 작성한 일기를 날짜와 내용으로 검색하고 확인하는 화면입니다.
 export default function DiaryListScreen() {
   const Router = useRouter();
   const [SearchText, SetSearchText] = useState("");
+  const [Items, SetItems] = useState<DiaryItem[]>([]);
+  const [Loading, SetLoading] = useState(true);
+  const [LoadError, SetLoadError] = useState<string | null>(null);
+
+  const LoadDiaries = useCallback(async () => {
+    SetLoading(true);
+    SetLoadError(null);
+
+    try {
+      const Data = await FetchQuestionDiaries();
+      SetItems(Data.map(ToDiaryItem));
+    } catch (Error_) {
+      SetLoadError(
+        Error_ instanceof Error ? Error_.message : "일기를 불러오지 못했어요.",
+      );
+    } finally {
+      SetLoading(false);
+    }
+  }, []);
+
+  // 화면에 들어올 때마다(작성 후 돌아올 때 포함) 목록을 새로 불러옵니다.
+  useFocusEffect(
+    useCallback(() => {
+      LoadDiaries();
+    }, [LoadDiaries]),
+  );
 
   const FilteredItems = useMemo(() => {
     const Query = SearchText.trim().toLowerCase();
 
-    return MOCK_DIARY_ITEMS.filter(
+    return Items.filter(
       (Item) =>
         Item.date.includes(Query) ||
-        Item.title.toLowerCase().includes(Query) ||
         Item.content.toLowerCase().includes(Query),
     );
-  }, [SearchText]);
+  }, [Items, SearchText]);
 
   function HandleBackPress() {
     Router.back();
@@ -71,12 +91,12 @@ export default function DiaryListScreen() {
 
   function HandleCalendarPress() {
     // TODO: 날짜 선택 UI가 준비되면 선택한 날짜로 일기 목록을 필터링합니다.
-    Alert.alert("날짜 선택", "날짜 선택 기능을 준비하고 있어요.");
+    ShowAlert("날짜 선택", "날짜 선택 기능을 준비하고 있어요.");
   }
 
   function HandleDiaryPress(Item: DiaryItem) {
-    // TODO: 일기 상세 API와 화면이 준비되면 Item.id를 전달해 이동합니다.
-    Alert.alert(Item.title, "일기 상세 화면을 준비하고 있어요.");
+    // TODO: 상세 화면이 준비되면 GET /api/diary/answers/{id} 로 이동합니다.
+    ShowAlert("오늘의 일기", `${Item.date} 일기 상세 화면을 준비하고 있어요.`);
   }
 
   return (
@@ -156,42 +176,75 @@ export default function DiaryListScreen() {
           </Pressable>
         </View>
 
-        <View style={Styles.DiaryList}>
-          {FilteredItems.map((Item) => (
+        {Loading ? (
+          <View style={Styles.StateArea}>
+            <ActivityIndicator color="#759650" size="large" />
+            <Text style={Styles.StateText}>일기를 불러오는 중이에요...</Text>
+          </View>
+        ) : LoadError ? (
+          <View style={Styles.StateArea}>
+            <MaterialCommunityIcons
+              color="#B6735B"
+              name="alert-circle-outline"
+              size={44}
+            />
+            <Text style={Styles.StateText}>{LoadError}</Text>
             <Pressable
-              accessibilityLabel={`${Item.title} 일기 자세히 보기`}
+              accessibilityLabel="다시 시도"
               accessibilityRole="button"
-              key={Item.id}
-              onPress={() => HandleDiaryPress(Item)}
+              onPress={LoadDiaries}
               style={({ pressed }) => [
-                Styles.DiaryCard,
+                Styles.RetryButton,
                 pressed && Styles.Pressed,
               ]}
             >
-              <View style={Styles.DiaryTextArea}>
-                <Text style={Styles.DiaryDate}>
-                  {Item.date} ({Item.day})
-                </Text>
-                <Text style={Styles.DiaryTitle}>{Item.title}</Text>
-                <Text numberOfLines={3} style={Styles.DiaryContent}>
-                  {Item.content}
-                </Text>
-              </View>
-
-              <View style={Styles.DetailArea}>
-                <View style={Styles.ArrowButton}>
-                  <FontAwesome color="#668449" name="angle-right" size={27} />
-                </View>
-                <Text style={Styles.DetailText}>자세히 보기</Text>
-              </View>
+              <Text style={Styles.RetryText}>다시 시도</Text>
             </Pressable>
-          ))}
-        </View>
-
-        {FilteredItems.length === 0 && (
-          <View style={Styles.EmptyResult}>
-            <Text style={Styles.EmptyResultText}>검색된 일기가 없어요.</Text>
           </View>
+        ) : (
+          <>
+            <View style={Styles.DiaryList}>
+              {FilteredItems.map((Item) => (
+                <Pressable
+                  accessibilityLabel={`${Item.date} 일기 자세히 보기`}
+                  accessibilityRole="button"
+                  key={Item.id}
+                  onPress={() => HandleDiaryPress(Item)}
+                  style={({ pressed }) => [
+                    Styles.DiaryCard,
+                    pressed && Styles.Pressed,
+                  ]}
+                >
+                  <View style={Styles.DiaryTextArea}>
+                    <Text style={Styles.DiaryDate}>
+                      {Item.date} ({Item.day})
+                    </Text>
+                    <Text style={Styles.DiaryTitle}>오늘의 일기</Text>
+                    <Text numberOfLines={3} style={Styles.DiaryContent}>
+                      {Item.content}
+                    </Text>
+                  </View>
+
+                  <View style={Styles.DetailArea}>
+                    <View style={Styles.ArrowButton}>
+                      <FontAwesome color="#668449" name="angle-right" size={27} />
+                    </View>
+                    <Text style={Styles.DetailText}>자세히 보기</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+
+            {FilteredItems.length === 0 && (
+              <View style={Styles.EmptyResult}>
+                <Text style={Styles.EmptyResultText}>
+                  {Items.length === 0
+                    ? "아직 작성한 일기가 없어요."
+                    : "검색된 일기가 없어요."}
+                </Text>
+              </View>
+            )}
+          </>
         )}
 
         <View style={Styles.Guide}>
@@ -290,6 +343,31 @@ const Styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     paddingVertical: 0,
+  },
+  StateArea: {
+    alignItems: "center",
+    gap: 14,
+    justifyContent: "center",
+    minHeight: 280,
+    paddingHorizontal: 20,
+  },
+  StateText: {
+    color: "#66645E",
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  RetryButton: {
+    backgroundColor: "#718F51",
+    borderRadius: 10,
+    justifyContent: "center",
+    minHeight: 46,
+    paddingHorizontal: 30,
+  },
+  RetryText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
   },
   DiaryList: {
     gap: 10,
