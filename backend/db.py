@@ -22,3 +22,7 @@ def get_db():
 def ping():
     """Verify MongoDB is reachable. Raises if it is not."""
     get_client().admin.command("ping")
+
+
+# diary 코드 호환용: `from backend.db import db`
+db = get_db()
