@@ -20,6 +20,16 @@ class ErrorCode(Enum):
     NO_CHANGES = (400, "변경된 사항이 없습니다.")
     DIARY_DELETE_FAILED = (500, "삭제에 실패했습니다.")
 
+    # Question 에러
+    NO_QUESTIONS_AVAILABLE = (404, "등록된 질문이 없습니다.")
+    QUESTION_NOT_FOUND = (404, "해당하는 질문을 찾을 수 없습니다.")
+    ANSWERS_REQUIRED = (400, "답변이 필요합니다.")
+    ANSWER_EMPTY = (400, "답변 내용이 비어있습니다.")
+
+    # AI 꼬리질문 에러
+    FOLLOWUP_GENERATION_FAILED = (502, "AI 꼬리질문 생성에 실패했어요. 잠시 후 다시 시도해주세요.")
+    DIARY_COMPOSE_FAILED = (502, "AI 일기 작성에 실패했어요. 잠시 후 다시 시도해주세요.")
+
     def __init__(self, status, message):
         self.status = status
         self.message = message
