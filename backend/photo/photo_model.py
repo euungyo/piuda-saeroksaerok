@@ -1,12 +1,12 @@
 from datetime import datetime
 
 
-def create_photo_document(user_id, group_id, image_url, content=None):
+def create_photo_document(user_id, family_id, image_url, content=None):
     now = datetime.utcnow()
 
     return {
         "user_id": user_id,  
-        "group_id": group_id,               # 가족 그룹
+        "family_id": family_id,               # 가족 그룹
         "image_url": image_url,
         "content": content,
 
@@ -22,7 +22,7 @@ def photo_to_response(photo):
     return {
         "photo_id": str(photo["_id"]),
         "user_id": photo.get("user_id"),
-        "group_id": photo.get("group_id"),
+        "family_id": photo.get("family_id"),
         "image_url": photo.get("image_url"),
         "content": photo.get("content"),
         "is_available": photo.get("is_available", False),
