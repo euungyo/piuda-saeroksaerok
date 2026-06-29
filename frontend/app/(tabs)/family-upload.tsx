@@ -1,9 +1,11 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,29 +18,95 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const MAX_DESCRIPTION_LENGTH = 200;
+const API_BASE_URL = "http://192.168.0.47:5001";
 
-// 가족에게 공유할 사진과 설명을 입력하는 화면입니다.
 export default function FamilyUploadScreen() {
   const Router = useRouter();
   const [Description, SetDescription] = useState("");
+  const [SelectedImageUri, SetSelectedImageUri] = useState<string | null>(null);
+  const [Uploading, SetUploading] = useState(false);
 
   function HandleBackPress() {
     Router.back();
   }
 
-  function HandleSelectPhotosPress() {
-    // TODO: 이미지 선택 라이브러리를 연결한 뒤 선택한 사진 URI를 상태에 저장합니다.
-    Alert.alert("사진 선택", "사진 선택 기능을 준비하고 있어요.");
+  async function HandleSelectPhotosPress() {
+    const Permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!Permission.granted) {
+      Alert.alert("권한 필요", "사진을 선택하려면 앨범 접근 권한이 필요해요.");
+      return;
+    }
+
+    const Result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+
+    if (Result.canceled) {
+      return;
+    }
+
+    SetSelectedImageUri(Result.assets[0].uri);
   }
 
-  function HandleSharePress() {
-    // TODO: 선택한 사진과 설명을 FormData로 구성해 사진 등록 API로 전송합니다.
-    Alert.alert("가족에게 공유하기", "사진 등록 API가 연결되면 공유할 수 있어요.");
+  async function HandleSharePress() {
+    if (!SelectedImageUri) {
+      Alert.alert("사진 선택", "공유할 사진을 먼저 선택해주세요.");
+      return;
+    }
+
+    const TrimmedDescription = Description.trim();
+
+    if (!TrimmedDescription) {
+      Alert.alert("사진 설명", "사진 설명을 입력해주세요.");
+      return;
+    }
+
+    const Form = new FormData();
+
+    Form.append("image", {
+      uri: SelectedImageUri,
+      name: "family-photo.jpg",
+      type: "image/jpeg",
+    } as any);
+
+    Form.append("content", TrimmedDescription);
+    Form.append("user_id", "1");
+    Form.append("family_id", "1");
+
+    try {
+      SetUploading(true);
+
+      const Response = await fetch(`${API_BASE_URL}/api/photos`, {
+        method: "POST",
+        body: Form,
+      });
+
+      const Data = await Response.json();
+
+      if (!Response.ok) {
+        throw new Error(Data.message ?? "사진 등록에 실패했어요.");
+      }
+
+      Alert.alert("등록 완료", "가족 사진이 공유되었어요.");
+      SetDescription("");
+      SetSelectedImageUri(null);
+      Router.back();
+    } catch (Error_) {
+      Alert.alert(
+        "등록 실패",
+        Error_ instanceof Error ? Error_.message : "사진 등록에 실패했어요.",
+      );
+    } finally {
+      SetUploading(false);
+    }
   }
 
   function HandleResetPress() {
     SetDescription("");
-    // TODO: 이미지 상태가 추가되면 선택한 사진도 함께 초기화합니다.
+    SetSelectedImageUri(null);
   }
 
   return (
@@ -71,11 +139,7 @@ export default function FamilyUploadScreen() {
                 <Text style={Styles.HeaderSubtitle}>
                   사진과 소식을 가족에게 전해주세요
                 </Text>
-                <MaterialCommunityIcons
-                  color="#91A969"
-                  name="sprout"
-                  size={18}
-                />
+                <MaterialCommunityIcons color="#91A969" name="sprout" size={18} />
               </View>
             </View>
 
@@ -108,15 +172,23 @@ export default function FamilyUploadScreen() {
                 size={55}
               />
             </View>
+
             <Text style={Styles.PhotoPickerTitle}>사진을 선택해주세요</Text>
             <Text style={Styles.PhotoPickerDescription}>
-              여러 장 선택 가능해요
+              한 장 선택 가능해요
             </Text>
 
             <View style={Styles.EmptyPhotoArea}>
-              <Text style={Styles.EmptyPhotoText}>
-                선택한 사진이 여기에 표시돼요
-              </Text>
+              {SelectedImageUri ? (
+                <Image
+                  source={{ uri: SelectedImageUri }}
+                  style={Styles.SelectedImage}
+                />
+              ) : (
+                <Text style={Styles.EmptyPhotoText}>
+                  선택한 사진이 여기에 표시돼요
+                </Text>
+              )}
             </View>
           </Pressable>
 
@@ -148,13 +220,17 @@ export default function FamilyUploadScreen() {
             <Pressable
               accessibilityLabel="선택한 사진을 가족에게 공유"
               accessibilityRole="button"
+              disabled={Uploading}
               onPress={HandleSharePress}
               style={({ pressed }) => [
                 Styles.ShareButton,
+                Uploading && Styles.DisabledButton,
                 pressed && Styles.Pressed,
               ]}
             >
-              <Text style={Styles.ShareButtonText}>가족에게 공유하기</Text>
+              <Text style={Styles.ShareButtonText}>
+                {Uploading ? "공유하는 중..." : "가족에게 공유하기"}
+              </Text>
               <MaterialCommunityIcons
                 color="#FFFFFF"
                 name="send-outline"
@@ -165,9 +241,11 @@ export default function FamilyUploadScreen() {
             <Pressable
               accessibilityLabel="선택 내용 초기화"
               accessibilityRole="button"
+              disabled={Uploading}
               onPress={HandleResetPress}
               style={({ pressed }) => [
                 Styles.ResetButton,
+                Uploading && Styles.DisabledResetButton,
                 pressed && Styles.Pressed,
               ]}
             >
@@ -279,12 +357,17 @@ const Styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     marginTop: 16,
-    minHeight: 68,
+    minHeight: 120,
+    overflow: "hidden",
     width: "100%",
   },
   EmptyPhotoText: {
     color: "#AAA99F",
     fontSize: 12,
+  },
+  SelectedImage: {
+    height: "100%",
+    width: "100%",
   },
   DescriptionCard: {
     backgroundColor: "#FFFEFB",
@@ -361,6 +444,12 @@ const Styles = StyleSheet.create({
     color: "#5D7547",
     fontSize: 16,
     fontWeight: "900",
+  },
+  DisabledButton: {
+    opacity: 0.6,
+  },
+  DisabledResetButton: {
+    opacity: 0.5,
   },
   Pressed: {
     opacity: 0.68,
