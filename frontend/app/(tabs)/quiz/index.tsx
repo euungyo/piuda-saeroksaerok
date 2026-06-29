@@ -10,46 +10,37 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// 퀴즈 유형 코드를 화면에 표시할 한국어 이름으로 변환합니다.
-const QUIZ_TYPE_LABEL: Record<string, string> = {
-  consonant: "초성퀴즈",
-  general: "상식퀴즈",
-  opposite: "반댓말퀴즈",
-  blank: "빈칸채우기",
-};
+// 각 퀴즈 유형에 표시할 아이콘과 설명입니다.
+const QUIZ_TYPE_META: { type: string; label: string; icon: string; description: string }[] = [
+  { type: "consonant", label: "초성퀴즈", icon: "alphabetical-variant", description: "초성을 보고 단어를 맞춰보세요" },
+  { type: "general",   label: "상식퀴즈",  icon: "lightbulb-on-outline",  description: "일상 속 상식 문제를 풀어보세요" },
+  { type: "opposite",  label: "반댓말퀴즈", icon: "swap-horizontal",       description: "반대되는 말을 골라보세요" },
+  { type: "blank",     label: "빈칸채우기", icon: "text-box-outline",      description: "빈칸에 들어갈 말을 맞춰보세요" },
+];
 
-// 요일(0=일~6=토)별로 제공할 퀴즈 유형을 정의합니다.
-const DAY_QUIZ_TYPE: Record<number, string> = {
-  0: "general",   // 일
-  1: "consonant", // 월
-  2: "general",   // 화
-  3: "opposite",  // 수
-  4: "blank",     // 목
-  5: "consonant", // 금
-  6: "opposite",  // 토
-};
+// TODO: 요일별 자동 유형 선택 로직 (나중에 유형 선택 화면 대신 사용)
+// const DAY_QUIZ_TYPE: Record<number, string> = {
+//   0: "general",   // 일
+//   1: "consonant", // 월
+//   2: "general",   // 화
+//   3: "opposite",  // 수
+//   4: "blank",     // 목
+//   5: "consonant", // 금
+//   6: "opposite",  // 토
+// };
 
-// 오늘의 퀴즈 시작 화면입니다. 요일에 맞는 퀴즈 유형을 안내하고 시작하기 버튼을 제공합니다.
+// 퀴즈 유형 선택 화면입니다. 4가지 유형 카드를 보여주고 선택한 유형으로 풀이 화면에 진입합니다.
+// TODO: 유형 선택 → 요일별 자동 결정으로 전환 시 DAY_QUIZ_TYPE 주석 해제 후 이 컴포넌트 교체
 export default function QuizIndexScreen() {
   const Router = useRouter();
-
-  const Today = new Date();
-  const DayOfWeek = Today.getDay();
-  const QuizType = DAY_QUIZ_TYPE[DayOfWeek];
-  const QuizLabel = QUIZ_TYPE_LABEL[QuizType];
-  const DayLabel = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"][DayOfWeek];
 
   function HandleBackPress() {
     Router.back();
   }
 
-  // 퀴즈 풀이 화면으로 이동하며 오늘의 퀴즈 유형을 파라미터로 전달합니다.
-  function HandleStartPress() {
+  // 선택한 퀴즈 유형을 파라미터로 전달하며 풀이 화면으로 이동합니다.
+  function HandleTypePress(QuizType: string) {
     Router.push({ pathname: "./play", params: { type: QuizType } });
-  }
-
-  function HandleLaterPress() {
-    Router.replace("/");
   }
 
   return (
@@ -88,43 +79,31 @@ export default function QuizIndexScreen() {
           <MaterialCommunityIcons color="#C2D09E" name="leaf" size={25} style={Styles.TopLeafSecond} />
         </View>
 
-        <View style={Styles.QuizCard}>
-          <View style={Styles.BrainIconBackground}>
-            <MaterialCommunityIcons color="#4D7137" name="lightbulb-on-outline" size={57} />
-          </View>
+        <Text style={Styles.SelectTitle}>풀고 싶은 퀴즈를{"\n"}골라보세요</Text>
 
-          <Text style={Styles.MainTitle}>오늘의 퀴즈를{"\n"}시작해볼까요?</Text>
-
-          <View style={Styles.DividerRow}>
-            <View style={Styles.Divider} />
-            <MaterialCommunityIcons color="#91B75F" name="leaf" size={25} />
-            <View style={Styles.Divider} />
-          </View>
-
-          <Text style={Styles.QuizDescription}>
-            오늘은 {DayLabel} {QuizLabel}예요
-          </Text>
-          <Text style={Styles.QuizCount}>문제를 풀어보세요</Text>
-
-          <View style={Styles.ButtonArea}>
+        <View style={Styles.TypeList}>
+          {QUIZ_TYPE_META.map((Item) => (
             <Pressable
-              accessibilityLabel="오늘의 퀴즈 시작하기"
+              key={Item.type}
+              accessibilityLabel={`${Item.label} 시작하기`}
               accessibilityRole="button"
-              onPress={HandleStartPress}
-              style={({ pressed }) => [Styles.StartButton, pressed && Styles.Pressed]}
+              onPress={() => HandleTypePress(Item.type)}
+              style={({ pressed }) => [Styles.TypeCard, pressed && Styles.Pressed]}
             >
-              <Text style={Styles.StartButtonText}>시작하기</Text>
+              <View style={Styles.TypeIconWrap}>
+                <MaterialCommunityIcons
+                  color="#4D7137"
+                  name={Item.icon as any}
+                  size={36}
+                />
+              </View>
+              <View style={Styles.TypeTextArea}>
+                <Text style={Styles.TypeLabel}>{Item.label}</Text>
+                <Text style={Styles.TypeDescription}>{Item.description}</Text>
+              </View>
+              <FontAwesome color="#8AAE65" name="angle-right" size={22} />
             </Pressable>
-
-            <Pressable
-              accessibilityLabel="퀴즈를 나중에 하고 홈으로 이동"
-              accessibilityRole="button"
-              onPress={HandleLaterPress}
-              style={({ pressed }) => [Styles.LaterButton, pressed && Styles.Pressed]}
-            >
-              <Text style={Styles.LaterButtonText}>나중에 할게요</Text>
-            </Pressable>
-          </View>
+          ))}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -137,8 +116,8 @@ const Styles = StyleSheet.create({
     alignSelf: "center",
     flexGrow: 1,
     maxWidth: 430,
-    paddingBottom: 12,
-    paddingHorizontal: 10,
+    paddingBottom: 20,
+    paddingHorizontal: 14,
     width: "100%",
   },
   Header: {
@@ -156,68 +135,44 @@ const Styles = StyleSheet.create({
   TopLeftLeaves: { left: -10, position: "absolute", top: 60, transform: [{ rotate: "-30deg" }] },
   TopRightLeaves: { position: "absolute", right: -9, top: 65, transform: [{ rotate: "205deg" }] },
   TopLeafSecond: { marginLeft: 17, marginTop: -14, transform: [{ rotate: "35deg" }] },
-  QuizCard: {
+  SelectTitle: {
+    color: "#284E28",
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: -1.2,
+    lineHeight: 40,
+    marginBottom: 20,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  TypeList: { gap: 14 },
+  TypeCard: {
     alignItems: "center",
     backgroundColor: "#FFFEFB",
     borderColor: "#E9E5D6",
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1.2,
     elevation: 3,
-    flex: 1,
-    minHeight: 475,
-    paddingBottom: 20,
-    paddingHorizontal: 28,
-    paddingTop: 25,
+    flexDirection: "row",
+    gap: 14,
+    minHeight: 80,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     shadowColor: "#817A60",
     shadowOffset: { height: 3, width: 0 },
-    shadowOpacity: 0.12,
-    shadowRadius: 7,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
   },
-  BrainIconBackground: {
+  TypeIconWrap: {
     alignItems: "center",
     backgroundColor: "#F0F4DF",
-    borderRadius: 48,
-    height: 96,
+    borderRadius: 14,
+    height: 56,
     justifyContent: "center",
-    width: 96,
+    width: 56,
   },
-  MainTitle: {
-    color: "#284E28",
-    fontSize: 34,
-    fontWeight: "900",
-    letterSpacing: -1.4,
-    lineHeight: 47,
-    marginTop: 20,
-    textAlign: "center",
-  },
-  DividerRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 13,
-    marginTop: 22,
-    width: "83%",
-  },
-  Divider: { backgroundColor: "#ECE9DF", flex: 1, height: 1 },
-  QuizDescription: { color: "#5F625B", fontSize: 16, fontWeight: "700", marginTop: 20, textAlign: "center" },
-  QuizCount: { color: "#5F625B", fontSize: 16, fontWeight: "700", marginTop: 11, textAlign: "center" },
-  ButtonArea: { gap: 10, marginTop: "auto", paddingTop: 28, width: "100%" },
-  StartButton: {
-    alignItems: "center",
-    backgroundColor: "#779B4D",
-    borderRadius: 13,
-    justifyContent: "center",
-    minHeight: 52,
-  },
-  StartButtonText: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
-  LaterButton: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#779B4D",
-    borderRadius: 13,
-    borderWidth: 1.5,
-    justifyContent: "center",
-    minHeight: 45,
-  },
-  LaterButtonText: { color: "#668743", fontSize: 16, fontWeight: "800" },
+  TypeTextArea: { flex: 1 },
+  TypeLabel: { color: "#2D3A24", fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
+  TypeDescription: { color: "#6F6B62", fontSize: 13, fontWeight: "600", marginTop: 3 },
   Pressed: { opacity: 0.68, transform: [{ scale: 0.99 }] },
 });
