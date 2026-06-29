@@ -18,13 +18,25 @@ photo_bp = Blueprint(
 
 @photo_bp.route("", methods=["POST"])
 def create_photo_route():
-    data = request.get_json()
+    user_id = request.form.get("user_id")
+    family_id = request.form.get("family_id")
+    content = request.form.get("content")
+    image = request.files.get("image")
+
+    if not user_id:
+        return jsonify({"success": False, "message": "user_id는 필수입니다."}), 400
+
+    if not family_id:
+        return jsonify({"success": False, "message": "family_id는 필수입니다."}), 400
+
+    if not image:
+        return jsonify({"success": False, "message": "image 파일은 필수입니다."}), 400
 
     photo = create_photo(
-        user_id=data.get("user_id"),
-        family_id=data.get("family_id"),
-        image_url=data.get("image_url"),
-        content=data.get("content")
+        user_id=user_id,
+        family_id=family_id,
+        image=image,
+        content=content
     )
 
     return jsonify({
