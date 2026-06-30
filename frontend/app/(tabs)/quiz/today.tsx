@@ -1,6 +1,6 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,22 +13,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { FetchQuizQuestion, QuizQuestion, QuizType } from "@/lib/api";
+import { FetchQuizQuestion, QuizQuestion } from "@/lib/api";
 
-// 퀴즈 유형 코드를 화면에 표시할 한국어 이름으로 변환합니다.
-const QUIZ_TYPE_LABEL: Record<string, string> = {
-  consonant: "초성퀴즈",
-  general: "상식퀴즈",
-  opposite: "반댓말퀴즈",
-  blank: "빈칸채우기",
-};
-
-// 퀴즈 문제 풀이 화면입니다.
-// 초성퀴즈는 텍스트 직접 입력, 나머지 유형은 4지선다 버튼으로 답을 선택합니다.
-// 정답 확인 후 다음 문제 버튼으로 새 문제를 불러옵니다.
-export default function QuizPlayScreen() {
+// 오늘의 퀴즈 화면입니다.
+// 유형 없이 전체 문제 풀에서 랜덤으로 1문제를 제공합니다.
+// 정답 확인 후 다음 문제 없이 목록으로 돌아갑니다.
+export default function QuizTodayScreen() {
   const Router = useRouter();
-  const { type } = useLocalSearchParams<{ type: QuizType }>();
 
   const [Question, SetQuestion] = useState<QuizQuestion | null>(null);
   const [Loading, SetLoading] = useState(true);
@@ -37,17 +28,15 @@ export default function QuizPlayScreen() {
   const [TextAnswer, SetTextAnswer] = useState("");
   const [Submitted, SetSubmitted] = useState(false);
   const [IsCorrect, SetIsCorrect] = useState(false);
-  const [QuestionNumber, SetQuestionNumber] = useState(1);
 
   const InputRef = useRef<TextInput>(null);
 
-  // type 파라미터가 확정된 뒤 첫 문제를 불러옵니다.
   useEffect(() => {
-    LoadQuestion(type as QuizType);
-  }, [type]);
+    LoadQuestion();
+  }, []);
 
-  // 백엔드에서 랜덤 문제 1개를 불러오고 입력 상태를 초기화합니다.
-  async function LoadQuestion(quizType?: QuizType) {
+  // 전체 유형에서 랜덤으로 1문제를 불러옵니다.
+  async function LoadQuestion() {
     SetLoading(true);
     SetErrorMsg(null);
     SetSelectedOption(null);
@@ -56,7 +45,7 @@ export default function QuizPlayScreen() {
     SetIsCorrect(false);
 
     try {
-      const Data = await FetchQuizQuestion(quizType);
+      const Data = await FetchQuizQuestion();
       SetQuestion(Data);
     } catch {
       SetErrorMsg("문제를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
@@ -68,30 +57,15 @@ export default function QuizPlayScreen() {
   // 사용자가 입력한 답과 정답을 비교해 결과를 표시합니다.
   function HandleConfirm() {
     if (!Question) return;
-
     const UserAnswer =
-      Question.type === "consonant"
-        ? TextAnswer.trim()
-        : SelectedOption ?? "";
-
+      Question.type === "consonant" ? TextAnswer.trim() : SelectedOption ?? "";
     if (!UserAnswer) return;
-
     SetIsCorrect(UserAnswer === Question.answer);
     SetSubmitted(true);
   }
 
-  // 문제 번호를 올리고 같은 유형의 다음 문제를 불러옵니다.
-  function HandleNext() {
-    SetQuestionNumber((N) => N + 1);
-    LoadQuestion(type as QuizType);
-  }
-
   // 퀴즈 목록 화면으로 돌아갑니다.
   function HandleGoToList() {
-    Router.back();
-  }
-
-  function HandleBackPress() {
     Router.back();
   }
 
@@ -111,7 +85,7 @@ export default function QuizPlayScreen() {
           <Pressable
             accessibilityLabel="이전 화면으로 이동"
             accessibilityRole="button"
-            onPress={HandleBackPress}
+            onPress={HandleGoToList}
             style={({ pressed }) => [Styles.HeaderButton, pressed && Styles.Pressed]}
           >
             <FontAwesome color="#465735" name="angle-left" size={31} />
@@ -120,8 +94,8 @@ export default function QuizPlayScreen() {
           <View style={Styles.HeaderTextArea}>
             <Text style={Styles.HeaderTitle}>오늘의 퀴즈</Text>
             <View style={Styles.SubtitleRow}>
-              <Text style={Styles.HeaderSubtitle}>기억력과 암기력을 키워요</Text>
-              <MaterialCommunityIcons color="#91A969" name="sprout" size={18} />
+              <Text style={Styles.HeaderSubtitle}>오늘 하루 도전해보세요</Text>
+              <MaterialCommunityIcons color="#91A969" name="star-outline" size={18} />
             </View>
           </View>
 
@@ -142,7 +116,7 @@ export default function QuizPlayScreen() {
             <MaterialCommunityIcons color="#A08060" name="alert-circle-outline" size={48} />
             <Text style={Styles.ErrorText}>{ErrorMsg}</Text>
             <Pressable
-              onPress={() => LoadQuestion(type as QuizType)}
+              onPress={LoadQuestion}
               style={({ pressed }) => [Styles.RetryButton, pressed && Styles.Pressed]}
             >
               <Text style={Styles.RetryButtonText}>다시 시도</Text>
@@ -153,27 +127,6 @@ export default function QuizPlayScreen() {
         {/* 문제 카드 */}
         {!Loading && !ErrorMsg && Question && (
           <>
-            {/* 문제 번호 + 유형 */}
-            <View style={Styles.MetaRow}>
-              <Text style={Styles.QuestionNumber}>문제 {QuestionNumber}</Text>
-              <View style={Styles.TypeBadge}>
-                <MaterialCommunityIcons color="#668743" name="calendar-outline" size={14} />
-                <Text style={Styles.TypeBadgeText}>
-                  {QUIZ_TYPE_LABEL[Question.type] ?? "퀴즈"}
-                </Text>
-              </View>
-            </View>
-
-            {/* 진행 바 (50문제 기준) */}
-            <View style={Styles.ProgressBar}>
-              <View
-                style={[
-                  Styles.ProgressFill,
-                  { width: `${Math.min((QuestionNumber / 50) * 100, 100)}%` },
-                ]}
-              />
-            </View>
-
             <View style={Styles.QuizCard}>
               <MaterialCommunityIcons color="#91B75F" name="leaf" size={22} style={Styles.CardLeaf} />
 
@@ -295,26 +248,15 @@ export default function QuizPlayScreen() {
                   <Text style={Styles.ConfirmButtonText}>정답 확인</Text>
                 </Pressable>
               ) : (
-                <View style={Styles.PostAnswerButtons}>
-                  <Pressable
-                    accessibilityLabel="퀴즈 목록으로 이동"
-                    accessibilityRole="button"
-                    onPress={HandleGoToList}
-                    style={({ pressed }) => [Styles.ListButton, pressed && Styles.Pressed]}
-                  >
-                    <FontAwesome color="#5E8C3A" name="angle-left" size={18} />
-                    <Text style={Styles.ListButtonText}>목록으로</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityLabel="다음 문제로 이동"
-                    accessibilityRole="button"
-                    onPress={HandleNext}
-                    style={({ pressed }) => [Styles.NextButton, pressed && Styles.Pressed]}
-                  >
-                    <Text style={Styles.NextButtonText}>다음 문제</Text>
-                    <FontAwesome color="#FFFFFF" name="angle-right" size={20} />
-                  </Pressable>
-                </View>
+                <Pressable
+                  accessibilityLabel="퀴즈 목록으로 이동"
+                  accessibilityRole="button"
+                  onPress={HandleGoToList}
+                  style={({ pressed }) => [Styles.ListButton, pressed && Styles.Pressed]}
+                >
+                  <FontAwesome color="#5E8C3A" name="angle-left" size={18} />
+                  <Text style={Styles.ListButtonText}>퀴즈 목록으로</Text>
+                </Pressable>
               )}
             </View>
           </>
@@ -356,33 +298,6 @@ const Styles = StyleSheet.create({
     paddingVertical: 12,
   },
   RetryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
-  MetaRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  QuestionNumber: { color: "#34482A", fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
-  TypeBadge: {
-    alignItems: "center",
-    backgroundColor: "#EEF4E3",
-    borderColor: "#D4E4B8",
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  TypeBadgeText: { color: "#5A7A3A", fontSize: 12, fontWeight: "700" },
-  ProgressBar: {
-    backgroundColor: "#E9E5D6",
-    borderRadius: 4,
-    height: 6,
-    marginBottom: 14,
-    overflow: "hidden",
-  },
-  ProgressFill: { backgroundColor: "#779B4D", borderRadius: 4, height: "100%" },
   QuizCard: {
     alignItems: "center",
     backgroundColor: "#FFFEFB",
@@ -476,20 +391,6 @@ const Styles = StyleSheet.create({
   AnswerText: { color: "#3A5E25", fontSize: 15, fontWeight: "800" },
   ExplanationText: { color: "#5F625B", fontSize: 14, fontWeight: "600", lineHeight: 22, textAlign: "center" },
   ButtonArea: { marginTop: 16 },
-  PostAnswerButtons: { flexDirection: "row", gap: 10 },
-  ListButton: {
-    alignItems: "center",
-    backgroundColor: "#EEF4E3",
-    borderColor: "#C5D9A4",
-    borderRadius: 13,
-    borderWidth: 1.5,
-    flex: 1,
-    flexDirection: "row",
-    gap: 6,
-    justifyContent: "center",
-    minHeight: 52,
-  },
-  ListButtonText: { color: "#5E8C3A", fontSize: 17, fontWeight: "900" },
   ConfirmButton: {
     alignItems: "center",
     backgroundColor: "#779B4D",
@@ -499,16 +400,17 @@ const Styles = StyleSheet.create({
   },
   ConfirmButtonDisabled: { backgroundColor: "#B8C9A3" },
   ConfirmButtonText: { color: "#FFFFFF", fontSize: 19, fontWeight: "900" },
-  NextButton: {
+  ListButton: {
     alignItems: "center",
-    backgroundColor: "#5E8C3A",
+    backgroundColor: "#EEF4E3",
+    borderColor: "#C5D9A4",
     borderRadius: 13,
-    flex: 1,
+    borderWidth: 1.5,
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     justifyContent: "center",
     minHeight: 52,
   },
-  NextButtonText: { color: "#FFFFFF", fontSize: 19, fontWeight: "900" },
+  ListButtonText: { color: "#5E8C3A", fontSize: 19, fontWeight: "900" },
   Pressed: { opacity: 0.68, transform: [{ scale: 0.99 }] },
 });

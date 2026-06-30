@@ -40,7 +40,7 @@ export default function QuizIndexScreen() {
 
   // 선택한 퀴즈 유형을 파라미터로 전달하며 풀이 화면으로 이동합니다.
   function HandleTypePress(QuizType: string) {
-    Router.push({ pathname: "./play", params: { type: QuizType } });
+    Router.push({ pathname: "/(tabs)/quiz/play", params: { type: QuizType } });
   }
 
   return (
@@ -80,6 +80,23 @@ export default function QuizIndexScreen() {
         </View>
 
         <Text style={Styles.SelectTitle}>풀고 싶은 퀴즈를{"\n"}골라보세요</Text>
+
+        {/* 오늘의 퀴즈 카드 */}
+        <Pressable
+          accessibilityLabel="오늘의 퀴즈 시작하기"
+          accessibilityRole="button"
+          onPress={() => Router.push("/(tabs)/quiz/today")}
+          style={({ pressed }) => [Styles.TodayCard, pressed && Styles.Pressed]}
+        >
+          <View style={Styles.TodayIconWrap}>
+            <MaterialCommunityIcons color="#FFFFFF" name="star-outline" size={32} />
+          </View>
+          <View style={Styles.TodayTextArea}>
+            <Text style={Styles.TodayLabel}>오늘의 퀴즈</Text>
+            <Text style={Styles.TodayDescription}>오늘 하루 랜덤 문제에 도전해보세요</Text>
+          </View>
+          <FontAwesome color="#FFFFFF" name="angle-right" size={22} />
+        </Pressable>
 
         <View style={Styles.TypeList}>
           {QUIZ_TYPE_META.map((Item) => (
@@ -145,6 +162,33 @@ const Styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
+  TodayCard: {
+    alignItems: "center",
+    backgroundColor: "#5E8C3A",
+    borderRadius: 18,
+    elevation: 4,
+    flexDirection: "row",
+    gap: 14,
+    marginBottom: 20,
+    minHeight: 84,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    shadowColor: "#3A5E25",
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+  },
+  TodayIconWrap: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 14,
+    height: 56,
+    justifyContent: "center",
+    width: 56,
+  },
+  TodayTextArea: { flex: 1 },
+  TodayLabel: { color: "#FFFFFF", fontSize: 19, fontWeight: "900", letterSpacing: -0.5 },
+  TodayDescription: { color: "rgba(255,255,255,0.82)", fontSize: 13, fontWeight: "600", marginTop: 3 },
   TypeList: { gap: 14 },
   TypeCard: {
     alignItems: "center",
