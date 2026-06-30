@@ -110,9 +110,14 @@ export default function DiaryListScreen() {
     ShowAlert("날짜 선택", "날짜 선택 기능을 준비하고 있어요.");
   }
 
+  // 일기 조회 UI가 선택되면 일기 내용을 보여줍니다
   function HandleDiaryPress(Item: DiaryItem) {
-    // TODO: 상세 화면이 준비되면 GET /api/diary/answers/{id} 로 이동합니다.
-    ShowAlert("오늘의 일기", `${Item.date} 일기 상세 화면을 준비하고 있어요.`);
+    Router.push({
+      pathname: "/diary-detail" as any,
+      params: {
+        id: Item.id,
+      },
+    });
   }
 
   return (

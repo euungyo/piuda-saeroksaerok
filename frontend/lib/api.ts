@@ -130,6 +130,11 @@ export function FetchQuestionDiaries(): Promise<QuestionDiary[]> {
   return Request<QuestionDiary[]>("/api/diary/answers");
 }
 
+// 작성된 질문 일기 상세 조회
+export function FetchQuestionDiary(DiaryId: string): Promise<QuestionDiary> {
+  return Request<QuestionDiary>(`/api/diary/answers/${DiaryId}`);
+}
+
 // 오늘 일기를 작성했는지 여부 (일기 탭 진입 시 완료 알림용)
 export function FetchTodayDiaryStatus(): Promise<TodayDiaryStatus> {
   return Request<TodayDiaryStatus>("/api/diary/today");
