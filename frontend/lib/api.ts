@@ -157,3 +157,29 @@ export function ComposeDiary(DiaryId: string): Promise<QuestionDiary> {
     method: "POST",
   });
 }
+
+// 퀴즈 유형: 초성퀴즈 / 상식퀴즈 / 반댓말퀴즈 / 빈칸채우기
+export type QuizType = "consonant" | "general" | "opposite" | "blank";
+
+// 퀴즈 문제 데이터. type에 따라 사용하는 필드가 다릅니다.
+// - consonant: consonant(초성), hint(힌트), length(글자수)
+// - general / opposite / blank: question(문제), options(선택지 4개)
+export type QuizQuestion = {
+  id: string;
+  type: QuizType;
+  consonant?: string;
+  hint?: string;
+  length?: number;
+  question?: string;
+  options?: string[];
+  answer: string;
+  explanation: string;
+};
+
+// 퀴즈 문제 랜덤 1개 받기 (type 생략 시 전체 유형에서 랜덤 추출)
+export function FetchQuizQuestion(quizType?: QuizType): Promise<QuizQuestion> {
+  const Query = quizType ? `?type=${quizType}` : "";
+  return Request<{ Success: boolean; Message: string; Data: QuizQuestion }>(
+    `/api/quiz/question${Query}`,
+  ).then((Res) => Res.Data);
+}

@@ -30,6 +30,9 @@ class ErrorCode(Enum):
     FOLLOWUP_GENERATION_FAILED = (502, "AI 꼬리질문 생성에 실패했어요. 잠시 후 다시 시도해주세요.")
     DIARY_COMPOSE_FAILED = (502, "AI 일기 작성에 실패했어요. 잠시 후 다시 시도해주세요.")
 
+    # Quiz 에러
+    QUIZ_NOT_FOUND = (404, "퀴즈 문제를 찾을 수 없습니다.")
+
     def __init__(self, status, message):
         self.status = status
         self.message = message
