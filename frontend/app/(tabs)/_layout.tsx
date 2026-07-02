@@ -91,6 +91,7 @@ export default function TabLayout() {
       />
       <Tabs.Screen name="family-list" options={{ href: null }} />
       <Tabs.Screen name="family-upload" options={{ href: null }} />
+      <Tabs.Screen name="quiz_temp" options={{ href: null }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
       <Tabs.Screen name="two" options={{ href: null }} />
     </Tabs>

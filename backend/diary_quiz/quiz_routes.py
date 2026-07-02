@@ -1,7 +1,8 @@
-from flask import Blueprint
+from flask import Blueprint, request, jsonify
 
 from backend import db
 from backend.gemini import gemini_client
+from backend.diary_quiz.quiz_service import get_quiz_service
 
 
 QuizBlueprint = Blueprint(
@@ -38,6 +39,10 @@ def QuizHealth():
     }, (200 if ok else 503)
 
 
-# 연상 퀴즈 생성 로직은 팀원이 푸쉬하면 이어서 구현 예정.
-# DB 접근: backend.db.get_db()  또는  from backend.db import db
-# Gemini 호출: backend.gemini.gemini_client.generate(...)
+# 퀴즈 문제 랜덤 1개 조회
+# query param: type=consonant|general|opposite|blank (생략 시 전체에서 랜덤)
+@QuizBlueprint.route("/question", methods=["GET"])
+def get_quiz():
+    quiz_type = request.args.get("type", None)
+    response, status_code = get_quiz_service(quiz_type)
+    return jsonify(response), status_code
