@@ -12,6 +12,7 @@ from backend.photo.photo_model import (
     create_photo_document,
     photo_to_response
 )
+from datetime import datetime
 
 PhotoCollection = db["photos"]
 
@@ -143,4 +144,31 @@ def delete_photo(photo_id):
 
     return {
         "photo_id": photo_id
+    }
+
+def unlock_today_photos(family_id):
+    if not family_id:
+        raise CustomException(ErrorCode.INVALID_REQUEST)
+
+    today_start = datetime.combine(datetime.utcnow().date(), time.min)
+    today_end = datetime.combine(datetime.utcnow().date(), time.max)
+
+    result = PhotoCollection.update_many(
+        {
+            "family_id": family_id,
+            "created_at": {
+                "$gte": today_start,
+                "$lte": today_end
+            }
+        },
+        {
+            "$set": {
+                "is_available": True,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+
+    return {
+        "unlocked_count": result.modified_count
     }
