@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { API_BASE_URL, FetchQuizQuestion, QuizQuestion, QuizType } from "@/lib/api";
+import { FetchQuizQuestion, QuizQuestion, QuizType } from "@/lib/api";
 
 // 퀴즈 유형 코드를 화면에 표시할 한국어 이름으로 변환합니다.
 const QUIZ_TYPE_LABEL: Record<string, string> = {
@@ -65,41 +65,20 @@ export default function QuizPlayScreen() {
     }
   }
 
-async function HandleConfirm() {
-  if (!Question) return;
+  // 사용자가 입력한 답과 정답을 비교해 결과를 표시합니다.
+  function HandleConfirm() {
+    if (!Question) return;
 
-  const UserAnswer =
-    Question.type === "consonant"
-      ? TextAnswer.trim()
-      : SelectedOption ?? "";
+    const UserAnswer =
+      Question.type === "consonant"
+        ? TextAnswer.trim()
+        : SelectedOption ?? "";
 
-  if (!UserAnswer) return;
+    if (!UserAnswer) return;
 
-  try {
-    const Response = await fetch(`${API_BASE_URL}/api/quiz/submit`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: "1",
-        family_id: "1",
-        quiz_id: Question.id,
-        quiz_type: Question.type,
-        question: Question.question ?? Question.hint ?? Question.consonant,
-        answer: UserAnswer,
-        correct_answer: Question.answer,
-      }),
-    });
-
-    const Data = await Response.json();
-
-    SetIsCorrect(Data.Data.is_correct);
+    SetIsCorrect(UserAnswer === Question.answer);
     SetSubmitted(true);
-  } catch (Error) {
-    console.log("퀴즈 제출 실패:", Error);
   }
-}
 
   // 문제 번호를 올리고 같은 유형의 다음 문제를 불러옵니다.
   function HandleNext() {
