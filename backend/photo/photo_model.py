@@ -8,6 +8,7 @@ def create_photo_document(
     content=None,
     original_filename=None,
     stored_filename=None,
+    is_available=False
 ):
     now = datetime.utcnow()
 
@@ -18,7 +19,7 @@ def create_photo_document(
         "original_filename": original_filename,
         "stored_filename": stored_filename,
         "content": content,
-        "is_available": False,
+        "is_available": is_available,
         "available_after_quiz": True,
         "created_at": now,
         "updated_at": now,

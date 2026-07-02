@@ -1,11 +1,31 @@
 from backend.diary_quiz.quiz_model import get_random_question
 from backend.exceptions import CustomException
 from backend.error_code import ErrorCode
-from datetime import datetime
+from datetime import datetime, time
 from backend.db import db
 from backend.photo.photo_service import unlock_today_photos
 
 QuizResultCollection = db["quiz_results"]
+
+from datetime import datetime, time
+from backend.db import db
+
+QuizResultCollection = db["quiz_results"]
+
+def has_today_quiz_result(user_id, family_id):
+    today_start = datetime.combine(datetime.utcnow().date(), time.min)
+    today_end = datetime.combine(datetime.utcnow().date(), time.max)
+
+    result = QuizResultCollection.find_one({
+        "user_id": str(user_id),
+        "family_id": str(family_id),
+        "created_at": {
+            "$gte": today_start,
+            "$lte": today_end
+        }
+    })
+
+    return result is not None
 
 def get_quiz_service(quiz_type=None):
     question = get_random_question(quiz_type)

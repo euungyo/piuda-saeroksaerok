@@ -4,7 +4,6 @@ from bson import ObjectId
 import os
 import uuid
 from werkzeug.utils import secure_filename
-
 from backend.db import db
 from backend.exceptions import CustomException
 from backend.error_code import ErrorCode
@@ -14,10 +13,10 @@ from backend.photo.photo_model import (
 )
 from datetime import datetime, time
 
+
 PhotoCollection = db["photos"]
 
 UPLOAD_FOLDER = "backend/uploads"
-
 
 def create_photo(user_id, family_id, image, content=None):
     if not user_id:
@@ -44,13 +43,17 @@ def create_photo(user_id, family_id, image, content=None):
 
     image_url = f"/uploads/{stored_filename}"
 
+    from backend.diary_quiz.quiz_service import has_today_quiz_result
+    is_available = has_today_quiz_result(user_id, family_id)
+
     photo = create_photo_document(
         user_id=user_id,
         family_id=family_id,
         image_url=image_url,
         content=content,
         original_filename=original_filename,
-        stored_filename=stored_filename
+        stored_filename=stored_filename,
+        is_available=is_available
     )
 
     result = PhotoCollection.insert_one(photo)
