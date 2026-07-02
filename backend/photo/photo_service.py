@@ -12,7 +12,7 @@ from backend.photo.photo_model import (
     create_photo_document,
     photo_to_response
 )
-from datetime import datetime
+from datetime import datetime, time
 
 PhotoCollection = db["photos"]
 

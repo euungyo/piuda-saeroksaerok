@@ -25,6 +25,7 @@ type FamilyPhotoItem = {
   id: string;
   imageUrl: string;
   userId?: number;
+  isAvailable: boolean;
 };
 
 type PhotoApiItem = {
@@ -39,20 +40,18 @@ type PhotoApiItem = {
   photo_id?: number | string;
   user_id?: number;
   userId?: number;
+  is_available?: boolean;
+  isAvailable?: boolean;
 };
 
 const API_BASE_URL = "http://172.30.136.59:5001";
 
 function FormatDate(DateText?: string) {
-  if (!DateText) {
-    return "";
-  }
+  if (!DateText) return "";
 
   const ParsedDate = new Date(DateText);
 
-  if (Number.isNaN(ParsedDate.getTime())) {
-    return DateText;
-  }
+  if (Number.isNaN(ParsedDate.getTime())) return DateText;
 
   const Year = ParsedDate.getFullYear();
   const Month = String(ParsedDate.getMonth() + 1).padStart(2, "0");
@@ -62,17 +61,10 @@ function FormatDate(DateText?: string) {
 }
 
 function BuildImageUrl(ImagePath?: string) {
-  if (!ImagePath) {
-    return "";
-  }
+  if (!ImagePath) return "";
 
-  if (ImagePath.startsWith("http")) {
-    return ImagePath;
-  }
-
-  if (ImagePath.startsWith("/")) {
-    return `${API_BASE_URL}${ImagePath}`;
-  }
+  if (ImagePath.startsWith("http")) return ImagePath;
+  if (ImagePath.startsWith("/")) return `${API_BASE_URL}${ImagePath}`;
 
   return `${API_BASE_URL}/${ImagePath}`;
 }
@@ -87,6 +79,7 @@ function ToFamilyPhotoItem(Item: PhotoApiItem): FamilyPhotoItem {
     imageUrl: BuildImageUrl(ImagePath),
     familyId: Item.family_id ?? Item.familyId,
     userId: Item.user_id ?? Item.userId,
+    isAvailable: Item.is_available ?? Item.isAvailable ?? false,
   };
 }
 
@@ -97,8 +90,7 @@ export default function FamilyListScreen() {
   const [PhotoItems, SetPhotoItems] = useState<FamilyPhotoItem[]>([]);
   const [Loading, SetLoading] = useState(true);
   const [LoadError, SetLoadError] = useState<string | null>(null);
-  const [SelectedPhoto, SetSelectedPhoto] =
-    useState<FamilyPhotoItem | null>(null);
+  const [SelectedPhoto, SetSelectedPhoto] = useState<FamilyPhotoItem | null>(null);
 
   const LoadPhotos = useCallback(async () => {
     SetLoading(true);
@@ -152,11 +144,16 @@ export default function FamilyListScreen() {
   }
 
   function HandlePhotoPress(Item: FamilyPhotoItem) {
+    if (!Item.isAvailable) return;
     SetSelectedPhoto(Item);
   }
 
   function HandleCloseModal() {
     SetSelectedPhoto(null);
+  }
+
+  function HandleQuizPress() {
+    Router.push("/quiz" as any);
   }
 
   return (
@@ -300,21 +297,52 @@ export default function FamilyListScreen() {
             <View style={Styles.PhotoGrid}>
               {FilteredItems.map((Item) => (
                 <Pressable
-                  accessibilityLabel="가족사진 상세 보기"
+                  accessibilityLabel={
+                    Item.isAvailable
+                      ? "가족사진 상세 보기"
+                      : "잠긴 가족사진"
+                  }
                   accessibilityRole="button"
                   key={Item.id}
                   onPress={() => HandlePhotoPress(Item)}
                   style={({ pressed }) => [
                     Styles.PhotoCard,
-                    pressed && Styles.Pressed,
+                    pressed && Item.isAvailable && Styles.Pressed,
                   ]}
                 >
                   <View style={Styles.PhotoArea}>
                     {Item.imageUrl ? (
-                      <Image
-                        source={{ uri: Item.imageUrl }}
-                        style={Styles.PhotoImage}
-                      />
+                      <>
+                        <Image
+                          blurRadius={Item.isAvailable ? 0 : 18}
+                          source={{ uri: Item.imageUrl }}
+                          style={Styles.PhotoImage}
+                        />
+
+                        {!Item.isAvailable && (
+                          <View style={Styles.LockOverlay}>
+                            <Text style={Styles.LockIcon}>🔒</Text>
+                            <Text style={Styles.LockTitle}>잠긴 사진</Text>
+                            <Text style={Styles.LockText}>
+                              퀴즈를 풀면{"\n"}사진을 볼 수 있습니다.
+                            </Text>
+
+                            <Pressable
+                              accessibilityLabel="퀴즈 풀러가기"
+                              accessibilityRole="button"
+                              onPress={HandleQuizPress}
+                              style={({ pressed }) => [
+                                Styles.LockButton,
+                                pressed && Styles.Pressed,
+                              ]}
+                            >
+                              <Text style={Styles.LockButtonText}>
+                                퀴즈 풀러가기
+                              </Text>
+                            </Pressable>
+                          </View>
+                        )}
+                      </>
                     ) : (
                       <Text style={Styles.PhotoAreaText}>사진이 없어요</Text>
                     )}
@@ -354,7 +382,7 @@ export default function FamilyListScreen() {
         <View style={Styles.Guide}>
           <MaterialCommunityIcons color="#6E9A4E" name="leaf" size={19} />
           <Text style={Styles.GuideText}>
-            사진을 누르면 자세히 볼 수 있어요
+            퀴즈를 풀면 잠긴 사진을 볼 수 있어요
           </Text>
         </View>
       </ScrollView>
@@ -610,6 +638,42 @@ const Styles = StyleSheet.create({
   PhotoAreaText: {
     color: "#AAA99F",
     fontSize: 10,
+  },
+  LockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.38)",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  LockIcon: {
+    fontSize: 30,
+    marginBottom: 5,
+  },
+  LockTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  LockText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 17,
+    marginBottom: 9,
+    marginTop: 4,
+    textAlign: "center",
+  },
+  LockButton: {
+    backgroundColor: "#6E9A4E",
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+  },
+  LockButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
   },
   PhotoInfo: {
     paddingHorizontal: 11,
