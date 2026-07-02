@@ -57,3 +57,7 @@ AGENTS.md
 CLAUDE.md
 
 .vscode/
+
+# Uploaded images
+backend/uploads/*
+!backend/uploads/.gitkeep

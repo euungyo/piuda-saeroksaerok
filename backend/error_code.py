@@ -36,3 +36,7 @@ class ErrorCode(Enum):
     def __init__(self, status, message):
         self.status = status
         self.message = message
+
+    # Photo 에러
+    PHOTO_NOT_FOUND = (404, "해당하는 사진을 찾을 수 없습니다.")
+    PHOTO_IMAGE_REQUIRED = (400, "사진 이미지가 필요합니다.")

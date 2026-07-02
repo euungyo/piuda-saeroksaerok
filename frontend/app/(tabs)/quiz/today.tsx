@@ -13,11 +13,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { FetchQuizQuestion, QuizQuestion } from "@/lib/api";
+import { API_BASE_URL, FetchQuizQuestion, QuizQuestion } from "@/lib/api";
 
-// 오늘의 퀴즈 화면입니다.
-// 유형 없이 전체 문제 풀에서 랜덤으로 1문제를 제공합니다.
-// 정답 확인 후 다음 문제 없이 목록으로 돌아갑니다.
 export default function QuizTodayScreen() {
   const Router = useRouter();
 
@@ -35,7 +32,6 @@ export default function QuizTodayScreen() {
     LoadQuestion();
   }, []);
 
-  // 전체 유형에서 랜덤으로 1문제를 불러옵니다.
   async function LoadQuestion() {
     SetLoading(true);
     SetErrorMsg(null);
@@ -54,17 +50,45 @@ export default function QuizTodayScreen() {
     }
   }
 
-  // 사용자가 입력한 답과 정답을 비교해 결과를 표시합니다.
-  function HandleConfirm() {
+  async function HandleConfirm() {
     if (!Question) return;
+
     const UserAnswer =
-      Question.type === "consonant" ? TextAnswer.trim() : SelectedOption ?? "";
+      Question.type === "consonant"
+        ? TextAnswer.trim()
+        : SelectedOption ?? "";
+
     if (!UserAnswer) return;
-    SetIsCorrect(UserAnswer === Question.answer);
+
+    const IsAnswerCorrect = UserAnswer === Question.answer;
+
+    try {
+      const Response = await fetch(`${API_BASE_URL}/api/quiz/submit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: "1",
+          family_id: "1",
+          quiz_id: Question.id,
+          quiz_type: Question.type,
+          question: Question.question ?? Question.hint ?? Question.consonant ?? "",
+          answer: UserAnswer,
+          correct_answer: Question.answer,
+        }),
+      });
+
+      const Data = await Response.json();
+      console.log("오늘의 퀴즈 제출 결과:", Data);
+    } catch (Error) {
+      console.log("오늘의 퀴즈 제출 실패:", Error);
+    }
+
+    SetIsCorrect(IsAnswerCorrect);
     SetSubmitted(true);
   }
 
-  // 퀴즈 목록 화면으로 돌아갑니다.
   function HandleGoToList() {
     Router.back();
   }
@@ -80,7 +104,6 @@ export default function QuizTodayScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* 헤더 */}
         <View style={Styles.Header}>
           <Pressable
             accessibilityLabel="이전 화면으로 이동"
@@ -102,7 +125,6 @@ export default function QuizTodayScreen() {
           <View style={Styles.HeaderButton} />
         </View>
 
-        {/* 로딩 */}
         {Loading && (
           <View style={Styles.CenterBox}>
             <ActivityIndicator color="#779B4D" size="large" />
@@ -110,7 +132,6 @@ export default function QuizTodayScreen() {
           </View>
         )}
 
-        {/* 에러 */}
         {!Loading && ErrorMsg && (
           <View style={Styles.CenterBox}>
             <MaterialCommunityIcons color="#A08060" name="alert-circle-outline" size={48} />
@@ -124,13 +145,11 @@ export default function QuizTodayScreen() {
           </View>
         )}
 
-        {/* 문제 카드 */}
         {!Loading && !ErrorMsg && Question && (
           <>
             <View style={Styles.QuizCard}>
               <MaterialCommunityIcons color="#91B75F" name="leaf" size={22} style={Styles.CardLeaf} />
 
-              {/* 초성퀴즈 */}
               {IsConsonant && (
                 <>
                   <Text style={Styles.ConsonantText}>{Question.consonant}</Text>
@@ -154,7 +173,6 @@ export default function QuizTodayScreen() {
                 </>
               )}
 
-              {/* 4지선다 */}
               {!IsConsonant && (
                 <>
                   <Text style={Styles.QuestionText}>{Question.question}</Text>
@@ -173,16 +191,20 @@ export default function QuizTodayScreen() {
                             pressed && Styles.Pressed,
                           ]}
                         >
-                          <Text style={[
-                            Styles.OptionNumber,
-                            SelectedOption === Option && Styles.OptionTextSelected,
-                          ]}>
+                          <Text
+                            style={[
+                              Styles.OptionNumber,
+                              SelectedOption === Option && Styles.OptionTextSelected,
+                            ]}
+                          >
                             {Index + 1}.
                           </Text>
-                          <Text style={[
-                            Styles.OptionText,
-                            SelectedOption === Option && Styles.OptionTextSelected,
-                          ]}>
+                          <Text
+                            style={[
+                              Styles.OptionText,
+                              SelectedOption === Option && Styles.OptionTextSelected,
+                            ]}
+                          >
                             {Option}
                           </Text>
                           {SelectedOption === Option && (
@@ -200,13 +222,14 @@ export default function QuizTodayScreen() {
                 </>
               )}
 
-              {/* 결과 */}
               {Submitted && (
                 <View style={Styles.ResultArea}>
-                  <View style={[
-                    Styles.ResultIconWrap,
-                    IsCorrect ? Styles.ResultCorrectBg : Styles.ResultWrongBg,
-                  ]}>
+                  <View
+                    style={[
+                      Styles.ResultIconWrap,
+                      IsCorrect ? Styles.ResultCorrectBg : Styles.ResultWrongBg,
+                    ]}
+                  >
                     <MaterialCommunityIcons
                       color="#FFFFFF"
                       name={IsCorrect ? "check" : "close"}
@@ -214,10 +237,12 @@ export default function QuizTodayScreen() {
                     />
                   </View>
 
-                  <Text style={[
-                    Styles.ResultLabel,
-                    IsCorrect ? Styles.ResultCorrectText : Styles.ResultWrongText,
-                  ]}>
+                  <Text
+                    style={[
+                      Styles.ResultLabel,
+                      IsCorrect ? Styles.ResultCorrectText : Styles.ResultWrongText,
+                    ]}
+                  >
                     {IsCorrect ? "정답입니다!" : "아쉬워요!"}
                   </Text>
 
@@ -231,7 +256,6 @@ export default function QuizTodayScreen() {
               )}
             </View>
 
-            {/* 하단 버튼 */}
             <View style={Styles.ButtonArea}>
               {!Submitted ? (
                 <Pressable
