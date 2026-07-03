@@ -1,8 +1,9 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +11,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { FetchTodayDiaryStatus } from "@/lib/api";
+import { ShowAlert } from "@/lib/alert";
 
 type DiaryMenuCardProps = {
   description: string;
@@ -85,6 +89,31 @@ function DiaryMenuCard({
 // 일기 기능 선택 화면입니다. 백엔드 연결 전에는 다음 화면 준비 안내만 표시합니다.
 export default function DiaryScreen() {
   const Router = useRouter();
+  const [TodayWritten, SetTodayWritten] = useState(false);
+
+  // 일기 탭에 진입할 때마다 오늘 일기 작성 여부를 미리 받아둡니다.
+  useFocusEffect(
+    useCallback(() => {
+      let Active = true;
+
+      FetchTodayDiaryStatus()
+        .then((Status) => {
+          if (Active) {
+            SetTodayWritten(Status.written);
+          }
+        })
+        .catch(() => {
+          // 상태 확인 실패는 화면 사용을 막지 않으므로 조용히 무시합니다.
+          if (Active) {
+            SetTodayWritten(false);
+          }
+        });
+
+      return () => {
+        Active = false;
+      };
+    }, []),
+  );
 
   function HandleBackPress() {
     Router.back();
@@ -92,6 +121,12 @@ export default function DiaryScreen() {
 
   function HandleDiaryFeaturePress(FeatureName: string) {
     if (FeatureName === "오늘의 일기 작성") {
+      // 오늘 이미 작성했으면 작성 화면으로 넘어가지 않고 안내만 합니다.
+      if (TodayWritten) {
+        ShowAlert("오늘의 일기", "오늘치 일기를 이미 작성하셨어요!");
+        return;
+      }
+
       Router.push("./diary-write");
       return;
     }
@@ -101,7 +136,7 @@ export default function DiaryScreen() {
       return;
     }
 
-    Alert.alert(FeatureName, `${FeatureName} 화면을 준비하고 있어요.`);
+    ShowAlert(FeatureName, `${FeatureName} 화면을 준비하고 있어요.`);
   }
 
   return (

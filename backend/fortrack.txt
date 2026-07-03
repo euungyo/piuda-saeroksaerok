@@ -1,2 +1,6 @@
 임시파일
 flask 설정 좀 해주세요
+
+pip install -r requirements.txt
+
+이거 터미널에 치시면 됩니다. 혹시 모르니까 backend까지 들어가지 말고 전역에서 해주세욤

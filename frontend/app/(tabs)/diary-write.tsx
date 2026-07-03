@@ -1,9 +1,9 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Alert,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,39 +15,48 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type DiaryQuestion = {
-  placeholder: string;
-  question: string;
-};
-
-// 질문 API가 연결되기 전 일기 작성 흐름을 확인하기 위한 임시 질문입니다.
-const MOCK_DIARY_QUESTIONS: DiaryQuestion[] = [
-  {
-    question: "오늘 점심은\n무엇을 드셨나요?",
-    placeholder: "예: 밥, 국, 김치",
-  },
-  {
-    question: "오늘 가장 기억에\n남는 일은 무엇인가요?",
-    placeholder: "오늘 있었던 일을 적어보세요",
-  },
-  {
-    question: "오늘 하루의 기분은\n어떠셨나요?",
-    placeholder: "느낀 기분을 편하게 적어보세요",
-  },
-];
+import { FetchDailyQuestions, SubmitDiaryAnswers, type DiaryQuestion } from "@/lib/api";
+import { ShowAlert } from "@/lib/alert";
 
 // 질문에 차례대로 답하며 오늘의 일기를 작성하는 화면입니다.
 export default function DiaryWriteScreen() {
   const Router = useRouter();
-  const [Answers, SetAnswers] = useState<string[]>(
-    MOCK_DIARY_QUESTIONS.map(() => ""),
-  );
+  const [Questions, SetQuestions] = useState<DiaryQuestion[]>([]);
+  const [Answers, SetAnswers] = useState<string[]>([]);
   const [QuestionIndex, SetQuestionIndex] = useState(0);
+  const [Loading, SetLoading] = useState(true);
+  const [LoadError, SetLoadError] = useState<string | null>(null);
+  const [Submitting, SetSubmitting] = useState(false);
 
-  const CurrentQuestion = MOCK_DIARY_QUESTIONS[QuestionIndex];
-  const IsLastQuestion = QuestionIndex === MOCK_DIARY_QUESTIONS.length - 1;
-  const Progress =
-    ((QuestionIndex + 1) / MOCK_DIARY_QUESTIONS.length) * 100;
+  useEffect(() => {
+    LoadQuestions();
+  }, []);
+
+  // 백엔드에서 오늘의 질문을 받아옵니다.
+  async function LoadQuestions() {
+    SetLoading(true);
+    SetLoadError(null);
+
+    try {
+      const Data = await FetchDailyQuestions(3);
+      SetQuestions(Data);
+      SetAnswers(Data.map(() => ""));
+      SetQuestionIndex(0);
+    } catch (Error_) {
+      SetLoadError(
+        Error_ instanceof Error ? Error_.message : "질문을 불러오지 못했어요.",
+      );
+    } finally {
+      SetLoading(false);
+    }
+  }
+
+  const HasQuestions = Questions.length > 0;
+  const CurrentQuestion = Questions[QuestionIndex];
+  const IsLastQuestion = QuestionIndex === Questions.length - 1;
+  const Progress = HasQuestions
+    ? ((QuestionIndex + 1) / Questions.length) * 100
+    : 0;
 
   function HandleBackPress() {
     Router.back();
@@ -63,12 +72,12 @@ export default function DiaryWriteScreen() {
 
   function HandleVoicePress() {
     // TODO: 음성 인식 기능을 연결해 변환된 문장을 현재 답변에 입력합니다.
-    Alert.alert("말로 답하기", "음성 입력 기능을 준비하고 있어요.");
+    ShowAlert("말로 답하기", "음성 입력 기능을 준비하고 있어요.");
   }
 
-  function HandleNextPress() {
+  async function HandleNextPress() {
     if (!Answers[QuestionIndex].trim()) {
-      Alert.alert("답변을 입력해주세요", "오늘의 이야기를 짧게라도 남겨주세요.");
+      ShowAlert("답변을 입력해주세요", "오늘의 이야기를 짧게라도 남겨주세요.");
       return;
     }
 
@@ -77,8 +86,30 @@ export default function DiaryWriteScreen() {
       return;
     }
 
-    // TODO: Answers를 일기 저장 API로 전송한 뒤 완료 화면으로 이동합니다.
-    Alert.alert("오늘의 일기", "일기 저장 API가 연결되면 저장할 수 있어요.");
+    // 마지막 질문이면 모든 답변을 일기 저장 API로 전송합니다.
+    SetSubmitting(true);
+
+    try {
+      const Saved = await SubmitDiaryAnswers(
+        Questions.map((Question, Index) => ({
+          questionId: Question._id,
+          answer: Answers[Index].trim(),
+        })),
+      );
+
+      // 저장 후 AI 꼬리질문 페이지로 이동 (저장된 일기 id 전달)
+      Router.replace({
+        pathname: "./diary-followup",
+        params: { id: Saved._id },
+      });
+    } catch (Error_) {
+      ShowAlert(
+        "저장 실패",
+        Error_ instanceof Error ? Error_.message : "저장에 실패했어요.",
+      );
+    } finally {
+      SetSubmitting(false);
+    }
   }
 
   return (
@@ -122,87 +153,143 @@ export default function DiaryWriteScreen() {
             <View style={Styles.HeaderButton} />
           </View>
 
-          <View style={Styles.ProgressCard}>
-            <View style={Styles.ProgressHeader}>
-              <Text style={Styles.ProgressText}>
-                질문 {QuestionIndex + 1} / {MOCK_DIARY_QUESTIONS.length}
-              </Text>
-              <MaterialCommunityIcons color="#9DB676" name="leaf" size={24} />
+          {Loading ? (
+            <View style={Styles.StateArea}>
+              <ActivityIndicator color="#759650" size="large" />
+              <Text style={Styles.StateText}>질문을 불러오는 중이에요...</Text>
             </View>
-            <View style={Styles.ProgressTrack}>
-              <View style={[Styles.ProgressFill, { width: `${Progress}%` }]} />
-            </View>
-          </View>
-
-          <View style={Styles.QuestionCard}>
-            <View pointerEvents="none" style={Styles.CardLeaves}>
-              <MaterialCommunityIcons color="#A8BC7C" name="leaf" size={30} />
+          ) : LoadError ? (
+            <View style={Styles.StateArea}>
               <MaterialCommunityIcons
-                color="#C7D5A4"
-                name="leaf"
-                size={22}
-                style={Styles.SmallLeaf}
+                color="#B6735B"
+                name="alert-circle-outline"
+                size={44}
               />
-            </View>
-
-            <View style={Styles.QuestionIcon}>
-              <MaterialCommunityIcons
-                color="#FFFFFF"
-                name="head-question-outline"
-                size={38}
-              />
-            </View>
-
-            <Text style={Styles.QuestionText}>{CurrentQuestion.question}</Text>
-
-            <TextInput
-              accessibilityLabel={`${QuestionIndex + 1}번째 질문 답변`}
-              maxLength={500}
-              multiline
-              onChangeText={HandleAnswerChange}
-              placeholder={CurrentQuestion.placeholder}
-              placeholderTextColor="#999A92"
-              style={Styles.AnswerInput}
-              textAlignVertical="top"
-              value={Answers[QuestionIndex]}
-            />
-
-            <View style={Styles.ButtonArea}>
+              <Text style={Styles.StateText}>{LoadError}</Text>
               <Pressable
-                accessibilityLabel="말로 답하기"
+                accessibilityLabel="다시 시도"
                 accessibilityRole="button"
-                onPress={HandleVoicePress}
+                onPress={LoadQuestions}
                 style={({ pressed }) => [
-                  Styles.VoiceButton,
+                  Styles.RetryButton,
                   pressed && Styles.Pressed,
                 ]}
               >
-                <MaterialCommunityIcons
-                  color="#FFFFFF"
-                  name="microphone-outline"
-                  size={26}
+                <Text style={Styles.RetryText}>다시 시도</Text>
+              </Pressable>
+            </View>
+          ) : !HasQuestions ? (
+            <View style={Styles.StateArea}>
+              <Text style={Styles.StateText}>등록된 질문이 없어요.</Text>
+            </View>
+          ) : (
+            <>
+              <View style={Styles.ProgressCard}>
+                <View style={Styles.ProgressHeader}>
+                  <Text style={Styles.ProgressText}>
+                    질문 {QuestionIndex + 1} / {Questions.length}
+                  </Text>
+                  <MaterialCommunityIcons
+                    color="#9DB676"
+                    name="leaf"
+                    size={24}
+                  />
+                </View>
+                <View style={Styles.ProgressTrack}>
+                  <View
+                    style={[Styles.ProgressFill, { width: `${Progress}%` }]}
+                  />
+                </View>
+              </View>
+
+              <View style={Styles.QuestionCard}>
+                <View pointerEvents="none" style={Styles.CardLeaves}>
+                  <MaterialCommunityIcons
+                    color="#A8BC7C"
+                    name="leaf"
+                    size={30}
+                  />
+                  <MaterialCommunityIcons
+                    color="#C7D5A4"
+                    name="leaf"
+                    size={22}
+                    style={Styles.SmallLeaf}
+                  />
+                </View>
+
+                <View style={Styles.QuestionIcon}>
+                  <MaterialCommunityIcons
+                    color="#FFFFFF"
+                    name="head-question-outline"
+                    size={38}
+                  />
+                </View>
+
+                <Text style={Styles.QuestionText}>{CurrentQuestion.text}</Text>
+
+                <TextInput
+                  accessibilityLabel={`${QuestionIndex + 1}번째 질문 답변`}
+                  editable={!Submitting}
+                  maxLength={500}
+                  multiline
+                  onChangeText={HandleAnswerChange}
+                  placeholder="오늘 있었던 일을 편하게 적어보세요"
+                  placeholderTextColor="#999A92"
+                  style={Styles.AnswerInput}
+                  textAlignVertical="top"
+                  value={Answers[QuestionIndex]}
                 />
-                <Text style={Styles.ButtonText}>말로 답하기</Text>
-              </Pressable>
 
-              <Pressable
-                accessibilityLabel={
-                  IsLastQuestion ? "일기 작성 완료" : "다음 질문으로 이동"
-                }
-                accessibilityRole="button"
-                onPress={HandleNextPress}
-                style={({ pressed }) => [
-                  Styles.NextButton,
-                  pressed && Styles.Pressed,
-                ]}
-              >
-                <Text style={Styles.ButtonText}>
-                  {IsLastQuestion ? "작성 완료" : "다음 질문"}
-                </Text>
-                <FontAwesome color="#FFFFFF" name="angle-right" size={24} />
-              </Pressable>
-            </View>
-          </View>
+                <View style={Styles.ButtonArea}>
+                  <Pressable
+                    accessibilityLabel="말로 답하기"
+                    accessibilityRole="button"
+                    disabled={Submitting}
+                    onPress={HandleVoicePress}
+                    style={({ pressed }) => [
+                      Styles.VoiceButton,
+                      pressed && Styles.Pressed,
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      color="#FFFFFF"
+                      name="microphone-outline"
+                      size={26}
+                    />
+                    <Text style={Styles.ButtonText}>말로 답하기</Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityLabel={
+                      IsLastQuestion ? "일기 작성 완료" : "다음 질문으로 이동"
+                    }
+                    accessibilityRole="button"
+                    disabled={Submitting}
+                    onPress={HandleNextPress}
+                    style={({ pressed }) => [
+                      Styles.NextButton,
+                      pressed && Styles.Pressed,
+                    ]}
+                  >
+                    {Submitting ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Text style={Styles.ButtonText}>
+                          {IsLastQuestion ? "작성 완료" : "다음 질문"}
+                        </Text>
+                        <FontAwesome
+                          color="#FFFFFF"
+                          name="angle-right"
+                          size={24}
+                        />
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -258,6 +345,32 @@ const Styles = StyleSheet.create({
     color: "#6F6B62",
     fontSize: 12,
     fontWeight: "600",
+  },
+  StateArea: {
+    alignItems: "center",
+    flex: 1,
+    gap: 14,
+    justifyContent: "center",
+    minHeight: 420,
+    paddingHorizontal: 20,
+  },
+  StateText: {
+    color: "#66645E",
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  RetryButton: {
+    backgroundColor: "#718F51",
+    borderRadius: 10,
+    justifyContent: "center",
+    minHeight: 46,
+    paddingHorizontal: 30,
+  },
+  RetryText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
   },
   ProgressCard: {
     backgroundColor: "#FFFEFB",
