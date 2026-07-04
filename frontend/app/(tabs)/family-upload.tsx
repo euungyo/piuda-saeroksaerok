@@ -17,8 +17,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { API_BASE_URL } from "@/lib/api";
+
 const MAX_DESCRIPTION_LENGTH = 200;
-const API_BASE_URL = "http://172.30.136.59:5001";
 
 export default function FamilyUploadScreen() {
   const Router = useRouter();

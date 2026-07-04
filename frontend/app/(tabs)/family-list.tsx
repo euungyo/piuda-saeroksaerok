@@ -16,6 +16,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { API_BASE_URL } from "@/lib/api";
+
 type PhotoFilter = "all" | "recent";
 
 type FamilyPhotoItem = {
@@ -43,8 +45,6 @@ type PhotoApiItem = {
   is_available?: boolean;
   isAvailable?: boolean;
 };
-
-const API_BASE_URL = "http://172.30.136.59:5001";
 
 function FormatDate(DateText?: string) {
   if (!DateText) return "";

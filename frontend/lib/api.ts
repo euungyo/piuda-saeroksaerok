@@ -89,25 +89,39 @@ export type TodayDiaryStatus = {
   count: number;
 };
 
+const REQUEST_TIMEOUT_MS = 10000;
+
 // 공통 fetch 래퍼. 백엔드 에러 형식({ success:false, message })의 message 를 그대로 던집니다.
 async function Request<T>(Path: string, Options?: RequestInit): Promise<T> {
-  const Response = await fetch(`${API_BASE_URL}${Path}`, {
-    // 브라우저가 GET 응답을 캐싱해 같은 질문이 반복되는 것을 막습니다.
-    cache: "no-store",
-    headers: { "Content-Type": "application/json" },
-    ...Options,
-  });
+  const Controller = new AbortController();
+  const TimeoutId = setTimeout(() => Controller.abort(), REQUEST_TIMEOUT_MS);
 
-  const Data = await Response.json().catch(() => null);
+  try {
+    const Response = await fetch(`${API_BASE_URL}${Path}`, {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      signal: Controller.signal,
+      ...Options,
+    });
 
-  if (!Response.ok) {
-    const Message =
-      (Data && typeof Data.message === "string" && Data.message) ||
-      "요청에 실패했어요. 잠시 후 다시 시도해주세요.";
-    throw new Error(Message);
+    const Data = await Response.json().catch(() => null);
+
+    if (!Response.ok) {
+      const Message =
+        (Data && typeof Data.message === "string" && Data.message) ||
+        "요청에 실패했어요. 잠시 후 다시 시도해주세요.";
+      throw new Error(Message);
+    }
+
+    return Data as T;
+  } catch (Error_) {
+    if ((Error_ as any)?.name === "AbortError") {
+      throw new Error("네트워크 연결이 불안정해요. 잠시 후 다시 시도해주세요.");
+    }
+    throw Error_;
+  } finally {
+    clearTimeout(TimeoutId);
   }
-
-  return Data as T;
 }
 
 // 오늘의 질문 N개 받기 (작성 화면 진입 시)
