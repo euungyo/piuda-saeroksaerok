@@ -27,6 +27,43 @@ def has_today_quiz_result(user_id, family_id):
 
     return result is not None
 
+# 특정 유저의 오늘 퀴즈 결과를 조회합니다.
+def get_today_quiz_result_service(user_id, family_id):
+    if not user_id or not family_id:
+        raise CustomException(ErrorCode.INVALID_REQUEST)
+
+    today_start = datetime.combine(datetime.utcnow().date(), time.min)
+    today_end = datetime.combine(datetime.utcnow().date(), time.max)
+
+    result = QuizResultCollection.find_one(
+        {
+            "user_id": str(user_id),
+            "family_id": str(family_id),
+            "created_at": {"$gte": today_start, "$lte": today_end},
+        },
+        sort=[("created_at", -1)],
+    )
+
+    if not result:
+        return {
+            "Success": True,
+            "Message": "오늘 퀴즈 결과가 없습니다.",
+            "Data": {"solved": False},
+        }, 200
+
+    return {
+        "Success": True,
+        "Message": "오늘 퀴즈 결과를 불러왔습니다.",
+        "Data": {
+            "solved": True,
+            "is_correct": result.get("is_correct"),
+            "quiz_type": result.get("quiz_type"),
+            "question": result.get("question"),
+            "correct_answer": result.get("correct_answer"),
+        },
+    }, 200
+
+
 def get_quiz_service(quiz_type=None):
     question = get_random_question(quiz_type)
 

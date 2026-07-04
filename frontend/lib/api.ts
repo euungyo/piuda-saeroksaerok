@@ -188,3 +188,18 @@ export function FetchQuizQuestion(quizType?: QuizType): Promise<QuizQuestion> {
     `/api/quiz/question${Query}`,
   ).then((Res) => Res.Data);
 }
+
+export type QuizResult = {
+  solved: boolean;
+  is_correct?: boolean;
+  quiz_type?: QuizType;
+  question?: string;
+  correct_answer?: string;
+};
+
+// 오늘 퀴즈 결과 조회 (가족 유저용)
+export function FetchTodayQuizResult(userId: string, familyId: string): Promise<QuizResult> {
+  return Request<{ Success: boolean; Message: string; Data: QuizResult }>(
+    `/api/quiz/result?user_id=${userId}&family_id=${familyId}`,
+  ).then((Res) => Res.Data);
+}

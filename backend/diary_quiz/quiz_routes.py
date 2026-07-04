@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 
 from backend import db
 from backend.gemini import gemini_client
-from backend.diary_quiz.quiz_service import get_quiz_service, submit_quiz_service
+from backend.diary_quiz.quiz_service import get_quiz_service, submit_quiz_service, get_today_quiz_result_service
 
 QuizBlueprint = Blueprint(
     "Quiz",
@@ -46,7 +46,17 @@ def get_quiz():
     response, status_code = get_quiz_service(quiz_type)
     return jsonify(response), status_code
 
-#퀴즈제출
+# 오늘 퀴즈 결과 조회 (가족 유저용)
+# query param: user_id, family_id
+@QuizBlueprint.route("/result", methods=["GET"])
+def GetTodayQuizResult():
+    user_id = request.args.get("user_id")
+    family_id = request.args.get("family_id")
+    response, status_code = get_today_quiz_result_service(user_id, family_id)
+    return jsonify(response), status_code
+
+
+# 퀴즈 제출
 @QuizBlueprint.route("/submit", methods=["POST"])
 def SubmitQuiz():
     data = request.get_json()
